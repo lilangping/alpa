@@ -51,7 +51,7 @@ source('ALPG_main.R')
 #
 # 0. Please first execute the above command lines, before applying the main function
 #
-# 1. Please make sure all data have the same coodinate system
+# 1. Please make sure all data have the same coordinate system
 #
 # 2. The main function ALPG has four input parameters
 #    -> FileDEM: input DEM file, tif raster file is recommended
