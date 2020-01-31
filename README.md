@@ -2,6 +2,8 @@
 # alpg
 An algorithm for automatically generating landslide profile
 
+ALPG is freely available. ALPG is coded and should be executed in the RStudio environment (https://rstudio.com/).
+
 Plese first read the ALPG_pre.R file and execute the command lines in it before applying the main function.
 Examples of application and some instructions are also included in the ALPG_pre.R file.
 
