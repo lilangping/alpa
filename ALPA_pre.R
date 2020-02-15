@@ -53,7 +53,7 @@ source('ALPA_main.R')
 #
 # 1. Please make sure all data have the same coordinate system
 #
-# 2. The main function ALPA has four input parameters
+# 2. The main function ALPA has six inputs
 #    -> FileDEM: input DEM file, tif raster file is recommended
 #    -> FileLandslides: input landslide polygon, shapefile vector file
 #    -> MinGrpPntCnt: minimum group point count
