@@ -1,6 +1,6 @@
 
 # alpa
-An algorithm for automatic analysis of landslide path
+An algorithm for automatic analysis of landslide path.
 
 ALPA is coded in R and should be executed in the RStudio environment (https://rstudio.com/).
 
