@@ -122,37 +122,45 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_
 #
 # === ExPERIENCES (ON PARAMETER SELECTION) ===
 # 
-# 1. Please be aware that there are no a set of universally appropriate parameters,
-#    for all landslide inventories, or for all landslides in an inventory.
-#    Parameters should be selected according to every individual landslide cases.
-# 2. According to personal experiences obtained from experiments on limited landslide inventories,
-#    the following recommendation is a good start.
-# 3. Set MinGrpPntCnt and MinGrpAcrDst to be 3 and 0, respectively.
-#    That is to say, no constraints from group point count and group anchor distance.
-# 4. Select MinEndAptRto and MaxEndDvtAgl applicable to your case study.
-#    0 and 180 mean no constraints from deviation angle for end group.
-#    Personal experiences suggest that 1.5 and 15 are good for most landslide cases.
-# 5. For some landslide cases, adjusting MinEndAptRto and MaxEndDvtAgl is not adequate.
-#    Try to adjust the MinGrpAcrDst (minimum group anchor distance).
-# 6. EndHdlAgrCfg can be 1 ~ 12.
-#    The recommendation for EndHdlAgrCfg is 1.
-#    If the initial and distal anchors of profiles of some landslides are not satisfied,
-#    try to re-process those landslides individually using an EndHdlAgrCfg value of 7 and 11.
-#    If the directions of strips of end groups for some landslides are not satisfied, 
-#    try to re-process those landslides individually,
-#    using an EndHdlAgrCfg value of 2 (if profile is generated using an EndHdlAgrCfg value of 1),
-#    or using 10 and 8 (if profile is generated using an EndHdlAgrCfg value of 7 and 11).
-#    Other choices of EndHdlAgrCfg are not commonly used, and might be very time consuming.
-# 7. The spatial resolution of the used DEM is a reasonable value for MinStpHrzLen.
-#    MinStpHrzLen controls number of strips, and will not influence the generation of profile.
-#    Smaller MSHL values will in general produce a larger number of strips.
-#    Be aware that the smallest count of strip is 2, no matter how large MinStpHrzLen is.
-# 8. The input DEM is expected to represent the sliding surface.
-#    If the input DEM represents the post-sliding or pre-sliding surface,
-#    which will be most likely in applications, a profile will be still generated;
-#    but, be aware that, elevation of profile will not represent elevation of sliding surface.
-# 9. Some problems of running ALPA 2.0 might be owing to the environment of user computer.
-#    Try to firstly solve them by searching solutions regarding R and RStudio.
+# 01. Please be aware that there are no a set of universally appropriate parameters,
+#     for all landslide inventories, or for all landslides in an inventory.
+#     Parameters should be selected according to every individual landslide cases.
+# 02. According to personal experiences obtained from experiments on limited landslide inventories,
+#     the following recommendation is a good start.
+# 03. Set MinGrpPntCnt and MinGrpAcrDst to be 3 and 0, respectively.
+#     That is to say, no constraints from group point count and group anchor distance.
+# 04. Select MinEndAptRto and MaxEndDvtAgl applicable to your case study.
+#     0 and 180 mean no constraints from deviation angle for end group.
+#     Personal experiences suggest that 1.5 and 15 are good for most landslide cases.
+# 05. EndHdlAgrCfg can be 1 ~ 12.
+#     The recommendation for EndHdlAgrCfg is 1.
+#     If the initial and distal anchors of profiles of some landslides are not satisfied,
+#     try to re-process those landslides individually using an EndHdlAgrCfg value of 7 and 11.
+#     If the directions of strips of end groups for some landslides are not satisfied, 
+#     try to re-process those landslides individually,
+#     using an EndHdlAgrCfg value of 2 (if profile is generated using an EndHdlAgrCfg value of 1),
+#     or using 10 and 8 (if profile is generated using an EndHdlAgrCfg value of 7 and 11).
+#     Other choices of EndHdlAgrCfg are not commonly used, and might be very time consuming.
+# 06. TIPS: if the end anchors or the profile's resolution of some landslides are not satisfied,
+#     try to re-process those landslides individually.
+#     TIPS: first, use 0 and 180 as MinEndAptRto and MaxEndDvtAgl,
+#     to see if subgrouping of points needs an adjustment (increasing or decreasing count of groups);
+#     then, adjust MinEndAptRto and MaxEndDvtAgl to get a reasonable subgrouping of points;
+#     finally, adjust EndHdlAgrCfg to get satisfied results for end groups.
+# 07. For some landslide cases, adjusting MinEndAptRto, MaxEndDvtAgl and EndHdlAgrCfg is not adequate.
+#     Try to adjust the MinGrpAcrDst (minimum group anchor distance).
+#     Use MinGrpAcrDst as a last resort. Whenever possible, don't use MinGrpAcrDst.
+#     The use of MinGrpAcrDst will reduce the resolution of profile (count of anchors).
+# 08. The spatial resolution of the used DEM is a reasonable value for MinStpHrzLen.
+#     MinStpHrzLen controls number of strips, and will not influence the generation of profile.
+#     Smaller MSHL values will in general produce a larger number of strips.
+#     Be aware that the smallest count of strip is 2, no matter how large MinStpHrzLen is.
+# 09. The input DEM is expected to represent the sliding surface.
+#     If the input DEM represents the post-sliding or pre-sliding surface,
+#     which will be most likely in applications, a profile will be still generated;
+#     but, be aware that, elevation of profile will not represent elevation of sliding surface.
+# 10. Some problems of running ALPA 2.0 might be owing to the environment of user computer.
+#     Try to firstly solve them by searching solutions regarding R and RStudio.
 #
 #
 #
