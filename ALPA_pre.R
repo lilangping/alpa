@@ -152,8 +152,11 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 #     Then, determine EndAgrCfgInt and EndAgrCfgDit respectively by optimizing end anchors and strips.
 #     Try 1, 2, and 3 to see which algorithm (quad, mbb, or even) is the best for generating end anchors.
 #     If end strips are not satisfied, try correspondingly 4, 5, and 6 to see if mmb is better for generating end strips.
+#     That is to say, if quad yields the best end anchor, try 4; if mbb, try 5; if even, try 6.
 #     EndAgrCfg having quad might be very time consuming.
-# 07. For some landslide cases, adjusting MinEndAptRto, MaxEndDvtAgl and EndHdlAgrCfg is not adequate.
+#     Therefore, if the direction of end strip is not the concern,
+#     the recommended order of EndAgrCfg is 5, 6, and then 4.
+# 07. For some landslide cases, adjusting MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt and EndAgrCfgDit is not adequate.
 #     Try to adjust the MinGrpAcrDst (minimum group anchor distance).
 #     Use MinGrpAcrDst as a last resort. Whenever possible, don't use MinGrpAcrDst.
 #     The use of MinGrpAcrDst will reduce the resolution of profile (count of anchors).
