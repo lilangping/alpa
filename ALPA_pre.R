@@ -6,9 +6,9 @@
 #                                                                        #
 #      An R-Script for for automatic analysis of landslide profile       #
 #                                                                        #
-#                             Version 2.7                                #
+#                             Version 3.0                                #
 #                                                                        #
-#                          November 21th, 2022                           #
+#                           June 09th, 2023                              #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -73,12 +73,13 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 #    -> FileLandslides:       input polygon of landslide, shapefile vector file.
 #    -> MinGrpPntCnt:         minimum group point count.
 #    -> MinGrpAcrDst:         minimum group anchor distance.
-#    -> MinEndAptRto:         minimum aspect ratio for end group (before split), threshold for checking MaxEndDvtAgl.
-#    -> MaxEndDvtAgl:         maximum deviation angle for end group (after split).
-#    -> EndHdlAgrCfg:         algorithm configuration for handling end group (anchor and direction).
+#    -> MinEndRtoInt:         minimum ratio for end group, initial.
+#    -> MinEndRtoDit:         minimum ratio for end group, distal.
+#    -> EndAgrCfgInt:         algorithm configuration for handling end group (anchor and strip), initial.
+#    -> EndAgrCfgDit:         algorithm configuration for handling end group (anchor and strip), distal.
 #    -> MinStpHrzLen:         minimum strip horizontal length.
 #    -> FilePrefix:           prefix for output files.
-#    -> OutputTemp:           whether output temporary results/files, T or F (default).
+#    -> OutputHrcl:           whether output hierarchical results/files, T or F (default).
 #
 # 4. The output points and profiles are two dimensional (2D).
 #    3D (z-aware) points and profiles can be produced based on the output excel files,
@@ -103,20 +104,24 @@ source('ALPA_main.R')
 # -> FileLandslides:        "lsd.shp"
 # -> MinGrpPntCnt:          3
 # -> MinGrpAcrDst:          0
-# -> MinEndAptRto:          1.5
-# -> MaxEndDvtAgl:          15
-# -> EndHdlAgrCfg:          1
+# -> MinEndRtoInt:          0.00
+# -> MinEndRtoDit:          0.00
+# -> EndAgrCfgInt:          1
+# -> EndAgrCfgDit:          1
 # -> MinStpHrzLen:          30
-# -> FilePrefix:            "case_c003_d000_r1.5_a015_e001_s030"
+# -> FilePrefix:            "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030"
 # 
-# If you process an inventory consisting of many landslides,
-# recommend not to output temporal results/files, and execute:
-ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_s030")
+# Recommend not to output hierarchical results/files, 
+# especially when processing an inventory consisting of many landslides,
+# and to execute:
+ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030")
 # 
 # If you process an individual landslide,
-# you can try to output temporal results/files, and execute:
-# Please NOTE: this function is currently temporarily disabled.
-# ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_s030", T)
+# and want to inspect the hierarchical sub- grouping steps,
+# you can try to output hierarchical results/files, and to execute:
+ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030", T)
+# Please NOTE: only hierarchical sub- groups and anchors will be output,
+# and, will be very time consuming, if set EndAgrCfg to be 1 or 4.
 #
 #
 #
@@ -129,24 +134,25 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_
 #     the following recommendation is a good start.
 # 03. Set MinGrpPntCnt and MinGrpAcrDst to be 3 and 0, respectively.
 #     That is to say, no constraints from group point count and group anchor distance.
-# 04. Select MinEndAptRto and MaxEndDvtAgl applicable to your case study.
-#     0 and 180 mean no constraints from deviation angle for end group.
-#     Personal experiences suggest that 1.5 and 15 are good for most landslide cases.
-# 05. EndHdlAgrCfg can be 1 ~ 12.
-#     The recommendation for EndHdlAgrCfg is 1.
-#     If the initial and distal anchors of profiles of some landslides are not satisfied,
-#     try to re-process those landslides individually using an EndHdlAgrCfg value of 7 and 11.
-#     If the directions of strips of end groups for some landslides are not satisfied, 
-#     try to re-process those landslides individually,
-#     using an EndHdlAgrCfg value of 2 (if profile is generated using an EndHdlAgrCfg value of 1),
-#     or using 10 and 8 (if profile is generated using an EndHdlAgrCfg value of 7 and 11).
-#     Other choices of EndHdlAgrCfg are not commonly used, and might be very time consuming.
-# 06. TIPS: if the end anchors or the profile's resolution of some landslides are not satisfied,
+# 04. Select MinEndRtoInt and MinEndRtoDit to be 0 and 0, respectively.
+#     That is to say, no constraints from point count ratio of end groups.
+# 05. EndAgrCfgInt and EndAgrCfgDit, define algorithm for generating end anchors and strips, and can be 1 ~ 6.
+#     1: quad + quad for anchor and strip respectively, slow.
+#     2:  mbb + quad for anchor and strip respectively, slow.
+#     3: even + quad for anchor and strip respectively, slow.
+#     4: quad + mbb  for anchor and strip respectively, slow.
+#     5:  mbb + mbb  for anchor and strip respectively, 1st fast.
+#     6: even + mbb  for anchor and strip respectively, 2nd fast.
+#     "quad", "mbb", and "even" stand for quadrilateral, minimum bounding box, and evenly splitting, respectively.
+#     The recommendation for EndAgrCfg is 1.
+# 06. TIPS: if the profile (sub- grouping) of some landslides are not satisfied,
 #     try to re-process those landslides individually.
-#     TIPS: first, use 0 and 180 as MinEndAptRto and MaxEndDvtAgl,
-#     to see if subgrouping of points needs an adjustment (increasing or decreasing count of groups);
-#     then, adjust MinEndAptRto and MaxEndDvtAgl to get a reasonable subgrouping of points;
-#     finally, adjust EndHdlAgrCfg to get satisfied results for end groups.
+#     First, by checking initial and distal end groups respectively, determine MinEndRtoInt and MinEndRtoDit,
+#     which will be a little bit larger than the ratio of the to-be-merged end sub- groups to all points.
+#     Then, determine EndAgrCfgInt and EndAgrCfgDit respectively by optimizing end anchors and strips.
+#     Try 1, 2, and 3 to see which algorithm (quad, mbb, or even) is the best for generating end anchors.
+#     If end strips are not satisfied, try correspondingly 4, 5, and 6 to see if mmb is better for generating end strips.
+#     EndAgrCfg having quad might be very time consuming.
 # 07. For some landslide cases, adjusting MinEndAptRto, MaxEndDvtAgl and EndHdlAgrCfg is not adequate.
 #     Try to adjust the MinGrpAcrDst (minimum group anchor distance).
 #     Use MinGrpAcrDst as a last resort. Whenever possible, don't use MinGrpAcrDst.
@@ -159,7 +165,7 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_
 #     If the input DEM represents the post-sliding or pre-sliding surface,
 #     which will be most likely in applications, a profile will be still generated;
 #     but, be aware that, elevation of profile will not represent elevation of sliding surface.
-# 10. Some problems of running ALPA 2.0 might be owing to the environment of user computer.
+# 10. Some problems of running ALPA might be owing to the environment of user computer.
 #     Try to firstly solve them by searching solutions regarding R and RStudio.
 #
 #
@@ -203,7 +209,15 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 1.5, 15, 1, 30, "case_c003_d000_r1.5_a015_e001_
 # Version 2.7 (November 21th, 2022)
 # 1. Fix generating profile in three-dimensional space.
 # 2. Fix bugs owing to compatibility of version.
-# 3. Temporarily disable output of temporal results/files.
+# 3. Temporarily disable output of hierarchical results/files.
+#
+# Version 3.0 (June 09th, 2023)
+# 1. Remove the stop criterion based on deviation angle in sub- grouping end groups.
+# 2. Add a stop criterion based on point count ratio in sub- grouping end groups.
+# 3. Fix bugs in differentiating right and left boundaries.
+# 4. Consider the situation that anchors or profile are outside landslide polygon.
+# 5. Update the algorithm configuration for handling the initial and distal end group.
+# 6. Display warning and error messages.
 #
 #
 #
