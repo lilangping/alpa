@@ -6,9 +6,9 @@
 #                                                                        #
 #      An R-Script for for automatic analysis of landslide profile       #
 #                                                                        #
-#                             Version 2.7                                #
+#                             Version 3.0                                #
 #                                                                        #
-#                          November 21th, 2022                           #
+#                           June 09th, 2023                              #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -25,13 +25,13 @@
 #
 #
 #
-ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, MinEndAptRto = 0, MaxEndDvtAgl = 180, EndHdlAgrCfg = 1, MinStpHrzLen = 30, FilePrefix = "", OutputTemp = F) {
+ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, MinEndRtoInt = 0, MinEndRtoDit = 0, EndAgrCfgInt = 3, EndAgrCfgDit = 3, MinStpHrzLen = 30, FilePrefix = "", OutputHrcl = F) {
   #
   # check input
   if (dendextend::is.natural.number(MinGrpPntCnt) == F) {
     #
-    # warning
-    warning("Error: MinGrpPntCnt is not a natural number.")
+    # message
+    message("Error: MinGrpPntCnt is not a natural number.")
     #
     # return
     return(NA)
@@ -40,8 +40,8 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
   # check input
   if (MinGrpAcrDst < 0) {
     #
-    # warning
-    warning("Error: MinGrpAcrDst is negative.")
+    # message
+    message("Error: MinGrpAcrDst is negative.")
     #
     # return
     return(NA)
@@ -80,7 +80,7 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
     pPolygons <- list_polygons[[i]]
     #
     # split using one polygons
-    spldf_profile <- f_lasld_split(raster_dem, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndAptRto, MaxEndDvtAgl, EndHdlAgrCfg, MinStpHrzLen, FilePrefix, i, OutputTemp)
+    spldf_profile <- f_lasld_split(raster_dem, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen, FilePrefix, i, OutputHrcl)
     #
     # update list
     if (is.null(spldf_profile) == F) {
@@ -113,7 +113,7 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
 #
 #
 #
-f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndAptRto, MaxEndDvtAgl, EndHdlAgrCfg, MinStpHrzLen, FilePrefix, FileID, OutputTemp) {
+f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen, FilePrefix, FileID, OutputHrcl) {
   # #
   # # show step
   # time_step_start <- f_show_step(paste("Read pnts start.", "\n", sep = ""))
@@ -152,9 +152,9 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # if read pnts fail
   if (max(pnts[, "IDB"]) == 0) {
     #
-    # error
+    # message
     str_failed <- paste("Error: Read pnts failed for the ", as.character(FileID), "th landslide.", sep = "", collapse = NULL)
-    warning(str_failed)
+    message(str_failed)
     #
     # save pnts
     file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts.xlsx", sep = "", collapse = NULL)
@@ -189,11 +189,14 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # if normal is vertical (horizontal plane)
   if (pnts_split[1, "Dx"] == 0 && pnts_split[1, "Dy"] == 0 && pnts_split[1, "Dz"] == 0) { 
     #
-    # error, if when reading pnts
-    warning("Error: The first fitted plane for the landslide is horizontal.")
+    # message, if when reading pnts
+    message("Error: The first fitted plane for the landslide is horizontal.")
     #
     # set SMS, to be "LSH" (horizontal landslide)
     pnts_split[, "SMS"] <- "LSH"
+    #
+    # message
+    message("Warning: SMS is LSH")
     #
     # save pnts
     file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp.xlsx", sep = "", collapse = NULL)
@@ -220,151 +223,26 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # get the maximum ID of the boundary points of the landslide
   IDB_max <- max(pnts_split[, "IDB"])
   #
+  # initial list_pnts, valid for maximum group count
+  list_pnts_ValidMax <- NULL
+  #
+  # initial list_pnts, list
+  list_list_pnts <- NULL
+  #
   # subgrouping
   while (TRUE) {
     #
-    # get finalization
-    Finalization <- min(data.frame(list_grpm)) == 1
-    #
-    # check
-    if (Finalization) {
-      #
-      # get path (centers and bnd sides)
-      if (EndHdlAgrCfg <= 6) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndHdlAgrCfg, T)
-      }
-      else if (EndHdlAgrCfg == 7) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 3, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 1, T) }
-      }
-      else if (EndHdlAgrCfg == 8) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 1, T) }
-      }
-      else if (EndHdlAgrCfg == 9) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 3, T) }
-      }
-      else if (EndHdlAgrCfg == 10) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 4, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 2, T) }
-      }
-      else if (EndHdlAgrCfg == 11) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 2, T) }
-      }
-      else if (EndHdlAgrCfg == 12) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, T)
-        #
-        # if fail, do not change algorithm for generating anchors in finalization
-        if (is.null(list_pnts_path)) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 4, T) }
-      }
-    }
-    else {
-      #
-      # get path (centers and bnd sides)
-      if (EndHdlAgrCfg <= 6) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndHdlAgrCfg, F)
-      }
-      else if (EndHdlAgrCfg == 7 || EndHdlAgrCfg == 8) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 1, F)
-      }
-      else if (EndHdlAgrCfg == 9) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 3, F)
-      }
-      else if (EndHdlAgrCfg == 10 || EndHdlAgrCfg == 11) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 2, F)
-      }
-      else if (EndHdlAgrCfg == 12) {
-        #
-        # get
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 4, F)
-      }
-    }
-    #
-    # get centers
-    pnts_split_anchors <- list_pnts_path[[1]]
-    #
-    # if save
-    # if (OutputTemp || Finalization) {
-    if (Finalization) {
-      #
-      # get length
-      length_prfl <- sum(f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy")]))
-      #
-      # initial
-      count_strip <- 0
-      #
-      # get count
-      while (T) {
-        #
-        # update
-        if (length_prfl/(count_strip+1) >= MinStpHrzLen) { count_strip <- count_strip+1 }
-        else { break }
-      }
-      #
-      # check, at least two strip, do not allow no station
-      count_strip <- max(count_strip, 2)
-      #
-      # get strips, strip might be merged
-      list_strips <- f_strips(pPolygons, list_pnts_path, count_strip)
-      #
-      # get
-      list_strip_sp <- list_strips[[1]]
-      strip_nodes_for_sp <- list_strips[[2]]
-      #
-      # get areas
-      list_areas <- f_strips_areas(pRasterDEM, list_strip_sp, strip_nodes_for_sp)
-      #
-      # get 
-      strip_sp <- list_strip_sp
-      # get 
-      strip_df <- list_areas[[1]]
-      # get 
-      strip_nodes <- list_areas[[2]]
-      # get 
-      strip_triangle_sp <- list_areas[[3]]
-      strip_triangle_df <- list_areas[[4]]
-      #
-      # get paras
-      paras_strip <- c(sum(strip_df[, "Lhrz"]), sum(strip_df[, "Ahrz"]), sum(strip_df[, "Lall"]), sum(strip_df[, "Aall"]))
-    }
+    # append
+    list_list_pnts[[length(list_list_pnts)+1]] <- list_pnts
     #
     # save, for every split
-    # if (OutputTemp) {
-    if (FALSE) {
+    if (OutputHrcl) {
+      #
+      # get path (centers and bnd sides)
+      list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, F)
+      #
+      # get centers
+      pnts_split_anchors <- list_pnts_path[[1]]
       #
       # save pnts
       file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), ".xlsx", sep = "", collapse = NULL)
@@ -381,96 +259,202 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
       # save shp
       file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_anchors", sep = "", collapse = NULL)
       f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
-      #
-      # save strips
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_df, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips", sep = "", collapse = NULL)
-      f_save_list2sp(strip_sp, strip_df, raster_CRS, file_out)
-      #
-      # save strips
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_triangles.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_triangle_df, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_triangles", sep = "", collapse = NULL)
-      f_save_list2sp(strip_triangle_sp, strip_triangle_df, raster_CRS, file_out)
-      #
-      # save nodes
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_nodes.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_nodes, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_nodes", sep = "", collapse = NULL)
-      f_pnts_save_points(strip_nodes, raster_CRS, file_out)
-      #
-      # save shp pln
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_nodes_pln2d", sep = "", collapse = NULL)
-      spldf_profile <- f_pnts_save_proflle(strip_nodes, paras_strip, c(MinGrpPntCnt, MinGrpAcrDst, MinEndAptRto, MaxEndDvtAgl, EndHdlAgrCfg, MinStpHrzLen), raster_CRS, file_out, FileID)
-      #
-      # save paras
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_strips_nodes_pln2d.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(spldf_profile@data, file_out)
     }
+    #
+    # get finalization
+    Finalization <- min(data.frame(list_grpm)) == 1
     #
     # save, and break, if no group need split
     if (Finalization) {
-      # 
-      # set SMS, to be "SMG", stop because all subgroup stop split
-      pnts_split[, "SMS"] <- "SMG"
       #
-      # save pnts
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(pnts_split, file_out)
+      # initial idx
+      idx_hierarchical <- length(list_list_pnts)
       #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sep = "", collapse = NULL)
-      f_pnts_save_points(pnts_split, raster_CRS, file_out)
+      # search valid, from the last hierarchical
+      while (idx_hierarchical >= 1) {
+        #
+        # get list_pnts
+        list_pnts <- list_list_pnts[[idx_hierarchical]]
+        #
+        # when quadrilateral algorithm is used for end groups,
+        # this will be the most time consuming step?
+        # #
+        # # show step
+        # time_step_start <- f_show_step(paste("f_pnts_path start.", "\n", sep = ""))
+        #
+        # get path (centers and bnd sides)
+        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, T)
+        # #
+        # # show step time
+        # f_show_time(paste("f_pnts_path done.", "\n", sep = ""), time_step_start)
+        #
+        # get centers
+        pnts_split_anchors <- list_pnts_path[[1]]
+        #
+        # get length
+        length_prfl <- sum(f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy")]))
+        #
+        # initial
+        count_strip <- 0
+        #
+        # get count
+        while (T) {
+          #
+          # update
+          if (length_prfl/(count_strip+1) >= MinStpHrzLen) { count_strip <- count_strip+1 }
+          else { break }
+        }
+        #
+        # check, at least two strip, do not allow no station
+        count_strip <- max(count_strip, 2)
+        #
+        # get strips, strip might be merged
+        list_strips <- f_strips(pPolygons, list_pnts_path, count_strip)
+        #
+        # check
+        if (is.null(list_strips)) {
+          #
+          list_areas <- NULL
+        }
+        else {
+          #
+          # get
+          list_strip_sp <- list_strips[[1]]
+          strip_nodes_for_sp <- list_strips[[2]]
+          #
+          # get areas
+          list_areas <- f_strips_areas(pRasterDEM, list_strip_sp, strip_nodes_for_sp)
+          #
+          # get 
+          strip_sp <- list_strip_sp
+          # get 
+          strip_df <- list_areas[[1]]
+          # get 
+          strip_nodes <- list_areas[[2]]
+          # get 
+          strip_triangle_sp <- list_areas[[3]]
+          strip_triangle_df <- list_areas[[4]]
+          #
+          # get paras
+          paras_strip <- c(sum(strip_df[, "Lhrz"]), sum(strip_df[, "Ahrz"]), sum(strip_df[, "Lall"]), sum(strip_df[, "Aall"]))
+        }
+        #
+        # check
+        # if (~(is.null(list_areas))) {
+        if (length(list_areas) != 0) {
+          #
+          # break
+          break
+        }
+        else {
+          #
+          # next
+          idx_hierarchical <- idx_hierarchical - 1
+        }
+      }
       #
-      # save anchors
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(pnts_split_anchors, file_out)
+      # check, if no valid
+      if (idx_hierarchical == 0) {
+        #
+        # message
+        message("Error: no valid sub- grouping.")
+        #
+        # initial pnts_split
+        pnts_split <- pnts
+        #
+        # set SMS, to be "SMO" (all outside),
+        # no valid sub- grouping for anchors or their collecting line inside landslide polygon
+        pnts_split[, "SMS"] <- "SMO"
+        #
+        # message
+        message("Warning: SMS is SMO.")
+        #
+        # save pnts
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(pnts_split, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp", sep = "", collapse = NULL)
+        f_pnts_save_points(pnts_split, raster_CRS, file_out)
+        #
+        # return
+        return(NULL)
+      }
       #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors", sep = "", collapse = NULL)
-      f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
-      #
-      # save strips
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_df, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips", sep = "", collapse = NULL)
-      f_save_list2sp(strip_sp, strip_df, raster_CRS, file_out)
-      #
-      # save strips
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_triangle_df, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles", sep = "", collapse = NULL)
-      f_save_list2sp(strip_triangle_sp, strip_triangle_df, raster_CRS, file_out)
-      #
-      # save nodes
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(strip_nodes, file_out)
-      #
-      # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes", sep = "", collapse = NULL)
-      f_pnts_save_points(strip_nodes, raster_CRS, file_out)
-      #
-      # save shp pln
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d", sep = "", collapse = NULL)
-      spldf_profile <- f_pnts_save_proflle(strip_nodes, paras_strip, c(MinGrpPntCnt, MinGrpAcrDst, MinEndAptRto, MaxEndDvtAgl, EndHdlAgrCfg, MinStpHrzLen), raster_CRS, file_out, FileID)
-      #
-      # save paras
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d.xlsx", sep = "", collapse = NULL)
-      f_pnts_save_xls(spldf_profile@data, file_out)
-      #
-      # break
-      break
+      # check, if have valid
+      else {
+        #
+        # list2pnts
+        pnts_split <- f_list2pnts(list_pnts)
+        #
+        # if valid in last hierarchical
+        if (idx_hierarchical == length(list_list_pnts)) {
+          # 
+          # set SMS, to be "SMG", stop because all subgroup stop split
+          pnts_split[, "SMS"] <- "SMG"
+        }
+        # if valid in previous hierarchical
+        else {
+          # 
+          # set SMS, to be "SMV" (have valid), 
+          # stop at valid sub- grouping for anchors or their collecting line inside landslide polygon
+          pnts_split[, "SMS"] <- "SMV"
+          #
+          # message
+          message("Warning: SMS is SMV.")
+        }
+        #
+        # save pnts
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(pnts_split, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sep = "", collapse = NULL)
+        f_pnts_save_points(pnts_split, raster_CRS, file_out)
+        #
+        # save anchors
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(pnts_split_anchors, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors", sep = "", collapse = NULL)
+        f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
+        #
+        # save strips
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(strip_df, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips", sep = "", collapse = NULL)
+        f_save_list2sp(strip_sp, strip_df, raster_CRS, file_out)
+        #
+        # save strips
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(strip_triangle_df, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles", sep = "", collapse = NULL)
+        f_save_list2sp(strip_triangle_sp, strip_triangle_df, raster_CRS, file_out)
+        #
+        # save nodes
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(strip_nodes, file_out)
+        #
+        # save shp
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes", sep = "", collapse = NULL)
+        f_pnts_save_points(strip_nodes, raster_CRS, file_out)
+        #
+        # save shp pln
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d", sep = "", collapse = NULL)
+        spldf_profile <- f_pnts_save_proflle(strip_nodes, paras_strip, c(MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen), raster_CRS, file_out, FileID)
+        #
+        # save paras
+        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d.xlsx", sep = "", collapse = NULL)
+        f_pnts_save_xls(spldf_profile@data, file_out)
+        #
+        # break
+        break
+      }
     }
     #
     # initial list_pnts_new
@@ -509,6 +493,45 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # set bool end
         bool_initial <- pnts_i[1, "grp"] == 1
         bool_distal <- pnts_i[1, "grp"] == grp_max
+        #
+        # check ratio for end groups
+        if (bool_initial || bool_distal) {
+          # #
+          # # show step
+          # time_step_start <- f_show_step(paste("Check end group ratio start.", "\n", sep = ""))
+          #
+          # get ratio for end group
+          EndRto <- nrow(pnts_i) / nrow(pnts)
+          #
+          # get ratio minimum
+          MinEndRto <- MinEndRtoInt
+          if (bool_distal) { MinEndRto <- MinEndRtoDit }
+          #
+          # if too small
+          if (EndRto < MinEndRto) {
+            #
+            # set grpm
+            grpm <- 1
+            #
+            # set pnts_i
+            pnts_i[, "SMG"] <- "SGR"
+            pnts_i[, "grp"] <- grpu
+            #
+            # update list
+            list_pnts_new[[grpu]] <- pnts_i
+            list_pntu_new[[grpu]] <- pntu_i
+            list_grpm_new[[grpu]] <- grpm
+            #
+            # update the upper group
+            grpu <- grpu + 1
+            #
+            # continue
+            next
+          }
+          # #
+          # # show step time
+          # f_show_time(paste("Check end group ratio done.", "\n", sep = ""), time_step_start)
+        }
         # #
         # # show step
         # time_step_start <- f_show_step(paste("Split pnts start.", "\n", sep = ""))
@@ -650,8 +673,8 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # debugging
         if ( (nrow(pnts_i_upper) + nrow(pnts_i_lower) ) != nrow(pnts_i)) {
           #
-          # warning
-          warning("Error: count of pnts in clustering is not consistent.")
+          # message
+          message("Error: count of pnts in clustering is not consistent.")
           #
           # return
           return(NULL)
@@ -691,8 +714,8 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           # f_pnts_save_points(pnts_i_upper, raster_CRS, "pnts_i_upper")
           # f_pnts_save_points(pnts_i_lower, raster_CRS, "pnts_i_lower")
           # #
-          # # warning
-          # warning("Error: subsets can be clustered after combination.")
+          # # message
+          # message("Error: subsets can be clustered after combination.")
           # #
           # # return
           # return(NULL)
@@ -700,6 +723,9 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # #
         # # show step time
         # f_show_time(paste("Check spatial contiguity done.", "\n", sep = ""), time_step_start)
+        # #
+        # # show step
+        # time_step_start <- f_show_step(paste("Check point count of sub- group start.", "\n", sep = ""))
         #
         # count of pnt in sub- pnts is smaller than a threshold
         if (nrow(pnts_i_upper) < MinGrpPntCnt || nrow(pnts_i_lower) < MinGrpPntCnt) {
@@ -722,6 +748,12 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           # continue
           next
         }
+        # #
+        # # show step time
+        # f_show_time(paste("Check point count of sub- group done.", "\n", sep = ""), time_step_start)
+        # #
+        # # show step
+        # time_step_start <- f_show_step(paste("Check plane of sub- group start.", "\n", sep = ""))
         #
         # get plane
         pnts_i_upper <- f_pnts_plane(pnts_i_upper)
@@ -771,6 +803,9 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           # continue
           next
         }
+        # #
+        # # show step time
+        # f_show_time(paste("Check plane of sub- group done.", "\n", sep = ""), time_step_start)
         # #
         # # show step
         # time_step_start <- f_show_step(paste("Check spatial impartiality start.", "\n", sep = ""))
@@ -839,6 +874,9 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # #
         # # show step time
         # f_show_time(paste("Check spatial impartiality done.", "\n", sep = ""), time_step_start)
+        # #
+        # # show step
+        # time_step_start <- f_show_step(paste("Check end group prolong start.", "\n", sep = ""))
         #
         # check ability to prolong for end group, initial
         if (bool_initial) {
@@ -919,221 +957,125 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # # show step time
         # f_show_time(paste("Check end group prolong done.", "\n", sep = ""), time_step_start)
         #
-        # make a copy
-        list_pnts_new_for_check <- list_pnts_new
-        #
-        # update list_pnts_new
-        list_pnts_new_for_check[[grpu]] <- pnts_i_upper
-        list_pnts_new_for_check[[grpu + 1]] <- pnts_i_lower
-        #
-        # if still have pnts, append
-        if ((i+1) <= length(list_pnts)) {
+        # only if MinGrpAcrDst is positive
+        if (MinGrpAcrDst > 0) {
           #
-          # append
-          for (k in (i+1):length(list_pnts)) {
+          # make a copy
+          list_pnts_new_for_check <- list_pnts_new
+          #
+          # update list_pnts_new
+          list_pnts_new_for_check[[grpu]] <- pnts_i_upper
+          list_pnts_new_for_check[[grpu + 1]] <- pnts_i_lower
+          #
+          # if still have pnts, append
+          if ((i+1) <= length(list_pnts)) {
             #
-            # get pnts_i
-            pnts_k <- list_pnts[[k]]
-            list_pnts_new_for_check[[length(list_pnts_new_for_check) + 1]] <- pnts_k
-          }
-        }
-        #
-        # get anchors and distances (before split)
-        pnts_split_anchors_before_split <- pnts_split_anchors
-        #
-        # get path (centers and bnd sides)
-        if (EndHdlAgrCfg <= 6) {
-          #
-          # get
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, EndHdlAgrCfg, F)
-        }
-        else if (EndHdlAgrCfg == 7 || EndHdlAgrCfg == 8) {
-          #
-          # get
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, 1, F)
-        }
-        else if (EndHdlAgrCfg == 9) {
-          #
-          # get
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, 3, F)
-        }
-        else if (EndHdlAgrCfg == 10 || EndHdlAgrCfg == 11) {
-          #
-          # get
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, 2, F)
-        }
-        else if (EndHdlAgrCfg == 12) {
-          #
-          # get
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, 4, F)
-        }
-        #
-        # check
-        if (is.null(list_pnts_path)) {
-          #
-          # set grpm
-          grpm <- 1
-          #
-          # set pnts_i
-          pnts_i[, "SMG"] <- "SGC"
-          pnts_i[, "grp"] <- grpu
-          #
-          # update list
-          list_pnts_new[[grpu]] <- pnts_i
-          list_pntu_new[[grpu]] <- pntu_i
-          list_grpm_new[[grpu]] <- grpm
-          #
-          # update the upper group
-          grpu <- grpu + 1
-          #
-          # continue
-          next
-        }
-        # #
-        # # show step time
-        # f_show_time(paste("Check group corners done.", "\n", sep = ""), time_step_start)
-        #
-        # get centers
-        pnts_split_anchors <- list_pnts_path[[1]]
-        #
-        # check deviation angle for end groups
-        if (length(list_pnts) > 1) {
-          #
-          # do not check deviation angle for the very initial landslide pnts
-          # the very initial landslide pnts is both initial end and distal end
-          # sometimes, length of the profile of the very initial landslide pnts
-          # is very short because path crossing bnd is not allowed
-          # this will cause very small aspect ratio
-          #
-          # and, do not use the generated length of end groups
-          # use the possible most prolong length along the moving direction
-          # the length of generated segment could be short when path is narrow
-          #
-          # handle end initial
-          if (bool_initial) {
-            #
-            # get area and length of the split pnts
-            end_area <- nrow(pnts_i) * raster_cellsize^2
-            end_length <- f_pnts_end_prolong(pnts_i, pnts_split_anchors_before_split[c(3, 1), ])
-            #
-            # get aspect ratio for end group after split
-            EndAptRto_initial <- end_length^2 / end_area
-            #
-            # if adequate small
-            if (EndAptRto_initial < MinEndAptRto) {
+            # append
+            for (k in (i+1):length(list_pnts)) {
               #
-              # get deviation angle for end group after split
-              EndDvtAgl_initial <- f_get_vectors2d_deviation_angle(pnts_split_anchors[c(4,3,2), ])
-              #
-              # if adequate large
-              if (EndDvtAgl_initial > MaxEndDvtAgl) {
-                #
-                # set grpm
-                grpm <- 1
-                #
-                # set pnts_i
-                pnts_i[, "SMG"] <- "SGD"
-                pnts_i[, "grp"] <- grpu
-                #
-                # update list
-                list_pnts_new[[grpu]] <- pnts_i
-                list_pntu_new[[grpu]] <- pntu_i
-                list_grpm_new[[grpu]] <- grpm
-                #
-                # update the upper group
-                grpu <- grpu + 1
-                #
-                # continue
-                next
-              }
+              # get pnts_i
+              pnts_k <- list_pnts[[k]]
+              list_pnts_new_for_check[[length(list_pnts_new_for_check) + 1]] <- pnts_k
             }
           }
           #
-          # handle end distal
-          if (bool_distal) {
+          # set EndAgrCfgInt
+          # for saving time
+          # replace quad with mbb
+          # will influence anchor distance
+          # will not influence group corners check
+          pEndAgrCfgInt <- EndAgrCfgInt
+          if (EndAgrCfgInt == 1) { pEndAgrCfgInt <- 2}
+          if (EndAgrCfgInt == 4) { pEndAgrCfgInt <- 5}
+          #
+          # set EndAgrCfgDit
+          # for saving time
+          # replace quad with mbb
+          # will influence anchor distance
+          # will not influence group corners check
+          pEndAgrCfgDit <- EndAgrCfgDit
+          if (EndAgrCfgDit == 1) { pEndAgrCfgDit <- 2}
+          if (EndAgrCfgDit == 4) { pEndAgrCfgDit <- 5}
+          #
+          # get path (centers and bnd sides)
+          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, pEndAgrCfgInt, pEndAgrCfgDit, F)
+          # #
+          # # show step
+          # time_step_start <- f_show_step(paste("Check group corners start.", "\n", sep = ""))
+          #
+          # check
+          if (is.null(list_pnts_path)) {
             #
-            # get area and length of the split pnts
-            end_area <- nrow(pnts_i) * raster_cellsize^2
-            end_length <- f_pnts_end_prolong(pnts_i, pnts_split_anchors_before_split[c(nrow(pnts_split_anchors_before_split)-2, nrow(pnts_split_anchors_before_split)), ])
+            # set grpm
+            grpm <- 1
             #
-            # get aspect ratio for end group after split
-            EndAptRto_distal <- end_length^2 / end_area
+            # set pnts_i
+            pnts_i[, "SMG"] <- "SGC"
+            pnts_i[, "grp"] <- grpu
             #
-            # if adequate small
-            if (EndAptRto_distal < MinEndAptRto) {
+            # update list
+            list_pnts_new[[grpu]] <- pnts_i
+            list_pntu_new[[grpu]] <- pntu_i
+            list_grpm_new[[grpu]] <- grpm
+            #
+            # update the upper group
+            grpu <- grpu + 1
+            #
+            # continue
+            next
+          }
+          # #
+          # # show step time
+          # f_show_time(paste("Check group corners done.", "\n", sep = ""), time_step_start)
+          #
+          # get centers
+          pnts_split_anchors <- list_pnts_path[[1]]
+          # #
+          # # show step
+          # time_step_start <- f_show_step(paste("Check minimum distance start.", "\n", sep = ""))
+          #
+          # get distances
+          pnts_split_distances <- f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy", "Cz")])
+          #
+          # initial
+          pnts_split_distances_min <- Inf
+          #
+          # get distance minimum
+          for (k in 1:nrow(pnts_split_distances)) {
+            #
+            # sometimes, group center anchor and inter-group center anchor will be the same?
+            if (pnts_split_distances[k] != 0 && pnts_split_distances[k] < pnts_split_distances_min) {
               #
-              # get deviation angle for end group after split
-              EndDvtAgl_distal <- f_get_vectors2d_deviation_angle(pnts_split_anchors[(nrow(pnts_split_anchors)-3):(nrow(pnts_split_anchors)-1), ])
-              #
-              # if adequate large
-              if (EndDvtAgl_distal > MaxEndDvtAgl) {
-                #
-                # set grpm
-                grpm <- 1
-                #
-                # set pnts_i
-                pnts_i[, "SMG"] <- "SGD"
-                pnts_i[, "grp"] <- grpu
-                #
-                # update list
-                list_pnts_new[[grpu]] <- pnts_i
-                list_pntu_new[[grpu]] <- pntu_i
-                list_grpm_new[[grpu]] <- grpm
-                #
-                # update the upper group
-                grpu <- grpu + 1
-                #
-                # continue
-                next
-              }
+              # update
+              pnts_split_distances_min <- pnts_split_distances[k]
             }
           }
-        }
-        # #
-        # # show step time
-        # f_show_time(paste("Check end group deviation done.", "\n", sep = ""), time_step_start)
-        #
-        # get distances
-        pnts_split_distances <- f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy", "Cz")])
-        #
-        # initial
-        pnts_split_distances_min <- Inf
-        #
-        # get distance minimum
-        for (k in 1:nrow(pnts_split_distances)) {
           #
-          # sometimes, group center anchor and inter-group center anchor will be the same?
-          if (pnts_split_distances[k] != 0 && pnts_split_distances[k] < pnts_split_distances_min) {
+          # if minimum measurement scale
+          if (pnts_split_distances_min <= MinGrpAcrDst) {
             #
-            # update
-            pnts_split_distances_min <- pnts_split_distances[k]
+            # set grpm
+            grpm <- 1
+            #
+            # set pnts_i
+            pnts_i[, "SMG"] <- "SGS"
+            pnts_i[, "grp"] <- grpu
+            #
+            # update list
+            list_pnts_new[[grpu]] <- pnts_i
+            list_pntu_new[[grpu]] <- pntu_i
+            list_grpm_new[[grpu]] <- grpm
+            #
+            # update the upper group
+            grpu <- grpu + 1
+            #
+            # continue
+            next
           }
+          # #
+          # # show step time
+          # f_show_time(paste("Check minimum distance done.", "\n", sep = ""), time_step_start)
         }
-        #
-        # if minimum measurement scale
-        if (pnts_split_distances_min <= MinGrpAcrDst) {
-          #
-          # set grpm
-          grpm <- 1
-          #
-          # set pnts_i
-          pnts_i[, "SMG"] <- "SGS"
-          pnts_i[, "grp"] <- grpu
-          #
-          # update list
-          list_pnts_new[[grpu]] <- pnts_i
-          list_pntu_new[[grpu]] <- pntu_i
-          list_grpm_new[[grpu]] <- grpm
-          #
-          # update the upper group
-          grpu <- grpu + 1
-          #
-          # continue
-          next
-        }
-        # #
-        # # show step time
-        # f_show_time(paste("Check minimum distance done.", "\n", sep = ""), time_step_start)
         #
         # update grp
         pnts_i_upper[, "grp"] <- grpu
@@ -1271,8 +1213,8 @@ f_pnts_read <- function(raster_dem, shp_lasld, file_out = "lasld_pln") {
   # maybe more than 1 (polygon) lines, difficult to handle
   if (length(shp_lasld_pln@lines) > 1) {
     #
-    # warning
-    warning("Error: shp_lasld_pln has more than 1 lines, read pnts failed.")
+    # message
+    message("Error: shp_lasld_pln has more than 1 lines, read pnts failed.")
     #
     # save
     rgdal::writeOGR(shp_lasld_pln, ".", file_out, overwrite_layer = T, driver = "ESRI Shapefile")
@@ -1282,8 +1224,8 @@ f_pnts_read <- function(raster_dem, shp_lasld, file_out = "lasld_pln") {
   }
   else if (length(shp_lasld_pln@lines[[1]]@Lines) > 1) {
     #
-    # warning
-    warning("Error: lines in shp_lasld_pln has more than 1 lines, read pnts failed.")
+    # message
+    message("Error: lines in shp_lasld_pln has more than 1 lines, read pnts failed.")
     #
     # save
     rgdal::writeOGR(shp_lasld_pln, ".", file_out, overwrite_layer = T, driver = "ESRI Shapefile")
@@ -1321,8 +1263,8 @@ f_pnts_read <- function(raster_dem, shp_lasld, file_out = "lasld_pln") {
       # debugging
       if (is.na(pnt_IDB)) {
         #
-        # warning
-        warning("Error: pnt_IDB is NA, read pnts failed.")
+        # message
+        message("Error: pnt_IDB is NA, read pnts failed.")
         #
         # save
         rgdal::writeOGR(shp_lasld_pln, ".", file_out, overwrite_layer = T, driver = "ESRI Shapefile")
@@ -1521,8 +1463,8 @@ f_pnts_dip <- function(pnts) {
   # vertical normal (horizontal plane)
   if (pnts_strike[1] ==0 && pnts_strike[2] == 0 && pnts_strike[3] ==0) { 
     #
-    # waring
-    warning("Warning: A fitted plane is horizontal.")
+    # message
+    message("Warning: A fitted plane is horizontal.")
     #
     # use the dip of mother plane
     return(c(pnts[1, "Dx"], pnts[1, "Dy"], pnts[1, "Dz"])) 
@@ -1645,8 +1587,8 @@ f_pnts_clustering <- function(pnts, raster_cellsize, raster_CRS) {
     # pause
     if (length(pnts_polygon_sf_sparts_sp@polygons) > 1) {
       #
-      # warning
-      warning("pause.")
+      # message
+      message("Warning: pause.")
     }
   }
   #
@@ -1700,42 +1642,6 @@ f_pnts_clustering <- function(pnts, raster_cellsize, raster_CRS) {
 #
 #
 #
-f_pnts_end_prolong <- function(pnts, vectors) {
-  #
-  # get vector1
-  vector1_x <- vectors[1, "Cx"]
-  vector1_y <- vectors[1, "Cy"]
-  #
-  # get vector, normalized
-  vector_x <- vectors[2, "Cx"] - vector1_x
-  vector_y <- vectors[2, "Cy"] - vector1_y
-  vector_length <- sqrt(vector_x^2 + vector_y^2)
-  vector_x <- vector_x / vector_length
-  vector_y <- vector_y / vector_length
-  #
-  # get count
-  count_pnt <- nrow(pnts)
-  #
-  # initial
-  column_length <- c()
-  #
-  # get prolong length
-  for (i in 1:count_pnt) {
-    #
-    # get vector
-    vector_i_x <- pnts[i, "Cx"] - vector1_x
-    vector_i_y <- pnts[i, "Cy"] - vector1_y
-    #
-    # append
-    column_length <- c(column_length, vector_i_x * vector_x + vector_i_y * vector_y)
-  }
-  #
-  # return
-  return(max(column_length))
-}
-#
-#
-#
 f_get_vectors2d_deviation_angle <- function(pnts) {
   #
   # get vectors
@@ -1767,8 +1673,8 @@ f_get_vectors2d_angle <- function(vector1, vector2) {
   # for debugging
   if (is.nan(vectors_agl)) {
     #
-    # warning
-    warning("Warning: vectors angle is NaN.")
+    # message
+    message("Warning: vectors angle is NaN.")
   }
   #
   # return
@@ -1849,8 +1755,8 @@ f_pnts_bnd_sides <- function(pnts_bnd, IDB_max) {
     # debugging
     if (is.na(IDB_step)) {
       #
-      # warning
-      warning("IDB_step is NA")
+      # message
+      message("Error: IDB_step is NA")
     }
     #
     # consecutive or not
@@ -1917,6 +1823,8 @@ f_pnts_bnd_sides_switch2 <- function(list_bnd_sides, LaunchAnchor, IDB_max) {
   IDB_launch_anchor <- LaunchAnchor[1, "IDB"]
   #
   # get IDB diff
+  # the order in the circle must be
+  # launch_anchor, start_right, start_left 
   IDB_diff_right <- IDB_start_right - IDB_launch_anchor
   IDB_diff_left <- IDB_start_left - IDB_launch_anchor
   #
@@ -2023,7 +1931,7 @@ f_pnts_bnd_sides_centerLs <- function(list_bnd_sides) {
 #
 #
 #
-f_pnts_bnd_end_even <- function(pnts, pnts0) {
+f_pnts_bnd_end_even <- function(pnts, pnts0, BoolInitial = T) {
   #
   # do not use circular statistics
   # just loop all the bnd pnts, to see which bnd pnt or bnd pair splits most equally
@@ -2142,8 +2050,8 @@ f_pnts_bnd_end_even <- function(pnts, pnts0) {
   }
   #
   # initial ID split
-  ID_split_right <- NA
-  ID_split_left <- NA
+  ID_split_Ahead <- NA
+  ID_split_Behind <- NA
   #
   # get minimum absolute difference
   diff_abs_min <- min(abs(column_count_diff[column_unblocked == 1]))
@@ -2178,8 +2086,8 @@ f_pnts_bnd_end_even <- function(pnts, pnts0) {
     }
     #
     # get
-    ID_split_right <- diff_abs_min_ID
-    ID_split_left <- diff_abs_min_ID
+    ID_split_Ahead <- diff_abs_min_ID
+    ID_split_Behind <- diff_abs_min_ID
   }
   else {
     #
@@ -2196,8 +2104,8 @@ f_pnts_bnd_end_even <- function(pnts, pnts0) {
         column_count_diff_around_zero <- c(column_count_diff_around_zero, 1) 
         #
         # get
-        ID_split_right <- i
-        ID_split_left <- i+1
+        ID_split_Ahead <- i+1
+        ID_split_Behind <- i
       }
       else {
         #
@@ -2220,8 +2128,8 @@ f_pnts_bnd_end_even <- function(pnts, pnts0) {
       f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
       f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
       #
-      # warning
-      warning("Warning: more than one pnt pair with difference around zero.")
+      # message
+      message("Error: more than one pnt pair with difference around zero.")
       #
       # return
       return(NULL)
@@ -2231,16 +2139,22 @@ f_pnts_bnd_end_even <- function(pnts, pnts0) {
     if (sum(column_count_diff_around_zero == 1) < 1) {
       #
       # get
-      ID_split_right <- diff_abs_min_ID
-      ID_split_left <- diff_abs_min_ID
+      ID_split_Ahead <- diff_abs_min_ID
+      ID_split_Behind <- diff_abs_min_ID
     }
   }
   #
   # get pnts bnd sides
   # both sides keep split pnt?
-  # not necessarily real left and right, just for a mark here
-  bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[1:ID_split_right, ]
-  bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[ID_split_left:nrow(pnts_pnt0_rm_bnd_ascending), ]
+  # for initial end group
+  bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
+  bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
+  # if distal end group, switch
+  if (BoolInitial == F) {
+    #
+    bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
+    bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
+  }
   #
   # return
   return(list(bnd_sides_right, bnd_sides_left))
@@ -2308,8 +2222,8 @@ f_pnts_bnd_end_even_ints <- function(pnts_curve_bnd, pnt0, pnt_bnd) {
     f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
     f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
     #
-    # warning
-    warning("Warning: no intscts gotten, in equally splitting pnts.")
+    # message
+    message("Error: no intscts gotten, in equally splitting pnts.")
     #
     # return
     return(NULL)
@@ -2428,6 +2342,14 @@ f_pnts_bnd_end_mbb <- function(pnts_bnd, pnts0) {
     #
     idx1 <- idxs[1]
     idx2 <- which(column_agl_icld == min(column_agl_icld[-idx1]))
+    #
+    if (length(idx2) > 1) {
+      #
+      idx2_expected <- idx1 + 2
+      if (idx2_expected > 4) { idx2_expected <- idx2_expected - 4 }
+      #
+      idx2 <- idx2[which(abs(idx2 - idx2_expected) == min(abs(idx2 - idx2_expected)))]
+    }
   }
   # 
   # owing to numerical errors
@@ -2962,7 +2884,7 @@ f_pnts_group_end_split <- function(pnts_bnd, pnt0, end_Anchor0) {
 #
 #
 #
-f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalization) {
+f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndAlgorithmDistal, BoolDirection) {
   #
   # get count
   count_pnts <- length(list_pnts)
@@ -3006,9 +2928,9 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
     #
     # get bnd sides
     list_bnd_sides <- list(bnd_sides_right, bnd_sides_left)
-    #
-    # switch, do not need here?
-    list_bnd_sides <- f_pnts_bnd_sides_switch2(list_bnd_sides, LaunchAnchor, IDB_max)
+    # #
+    # # switch, do not need here?
+    # list_bnd_sides <- f_pnts_bnd_sides_switch2(list_bnd_sides, LaunchAnchor, IDB_max)
     #
     # get bnd sides
     bnd_sides_right <- list_bnd_sides[[1]]
@@ -3110,11 +3032,20 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
     # get bnd sides
     if ((i == 1) || (i == count_pnts)) {
       #
+      # set
+      BoolInitial <- i == 1
+      #
+      # set
+      if (BoolInitial)
+      { EndAlgorithm <- EndAlgorithmInitial }
+      else
+      { EndAlgorithm <- EndAlgorithmDistal }
+      #
       # get sorted
       pnts_i_bnd_ascending <- f_pnts_bnd_ascending(pnts_i_bnd)
       #
       # check
-      if (i == 1) { 
+      if (BoolInitial) { 
         #
         # get pnts0
         pnts0 <- rbind(pnts_i_bnd_ascending[1, c("Cx", "Cy")], pnts_i_bnd_ascending[nrow(pnts_i_bnd_ascending), c("Cx", "Cy")])
@@ -3128,18 +3059,18 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       # Algorithm 1
       if (EndAlgorithm == 1) {
         #
-        # even
-        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0)
+        # quad
+        list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
         #
         # get, for end group
         bnd_sides_right <- list_end[[1]]
         bnd_sides_left <- list_end[[2]]
         #
         # check
-        if (Finalization) {
-          #
-          # mbb
-          list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+        if (BoolDirection) {
+          # #
+          # # quad
+          # list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
           #
           # get, for end group
           GrpBndAgl <- list_end[[3]]
@@ -3149,15 +3080,15 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       # Algorithm 2
       if (EndAlgorithm == 2) {
         #
-        # even
-        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0)
+        # mbb
+        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
         #
         # get, for end group
         bnd_sides_right <- list_end[[1]]
         bnd_sides_left <- list_end[[2]]
         #
         # check
-        if (Finalization) {
+        if (BoolDirection) {
           #
           # quad
           list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
@@ -3170,36 +3101,15 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       # Algorithm 3
       if (EndAlgorithm == 3) {
         #
-        # mbb
-        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+        # even
+        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0, BoolInitial)
         #
         # get, for end group
         bnd_sides_right <- list_end[[1]]
         bnd_sides_left <- list_end[[2]]
         #
         # check
-        if (Finalization) {
-          # #
-          # # mbb
-          # list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
-          #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
-        }
-      }
-      #
-      # Algorithm 4
-      if (EndAlgorithm == 4) {
-        #
-        # mbb
-        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (Finalization) {
+        if (BoolDirection) {
           #
           # quad
           list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
@@ -3209,8 +3119,8 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
         }
       }
       #
-      # Algorithm 5
-      if (EndAlgorithm == 5) {
+      # Algorithm 4
+      if (EndAlgorithm == 4) {
         #
         # quad
         list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
@@ -3220,7 +3130,7 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
         bnd_sides_left <- list_end[[2]]
         #
         # check
-        if (Finalization) {
+        if (BoolDirection) {
           #
           # mbb
           list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
@@ -3230,60 +3140,102 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
         }
       }
       #
-      # Algorithm 6
-      if (EndAlgorithm == 6) {
+      # Algorithm 5
+      if (EndAlgorithm == 5) {
         #
-        # quad
-        list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+        # mbb
+        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
         #
         # get, for end group
         bnd_sides_right <- list_end[[1]]
         bnd_sides_left <- list_end[[2]]
         #
         # check
-        if (Finalization) {
+        if (BoolDirection) {
           # #
-          # # quad
-          # list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+          # # mbb
+          # list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
           #
           # get, for end group
           GrpBndAgl <- list_end[[3]]
         }
       }
       #
-      # get bnd sides
-      list_pnts_i_bnd_sides <- list(bnd_sides_right, bnd_sides_left)
-      #
-      # check
-      if (i == 1) { 
+      # Algorithm 6
+      if (EndAlgorithm == 6) {
+        #
+        # even
+        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0, BoolInitial)
         #
         # get, for end group
-        if (Finalization) { GrpBndAgl_initial <- GrpBndAgl }
-        else { 
-          GrpBndAgl_initial <- NULL 
-          }
+        bnd_sides_right <- list_end[[1]]
+        bnd_sides_left <- list_end[[2]]
+        #
+        # check
+        if (BoolDirection) {
+          #
+          # mbb
+          list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+          #
+          # get, for end group
+          GrpBndAgl <- list_end[[3]]
+        }
+      }
+      #
+      # get sorted
+      pnts_i_bnd_ascending <- f_pnts_bnd_ascending(pnts_i_bnd)
+      #
+      # check
+      if (BoolInitial) { 
+        #
+        # get, for end group
+        if (BoolDirection) { GrpBndAgl_initial <- GrpBndAgl }
+        else { GrpBndAgl_initial <- NULL }
+        #
+        # need a switch
+        if (pnts_i_bnd_ascending[1, "IDB"] == bnd_sides_right[1, "IDB"]) {
+          #
+          # switch
+          bnd_sides_right0 <- bnd_sides_right
+          bnd_sides_right <- bnd_sides_left
+          bnd_sides_left <- bnd_sides_right0
+        }
         #
         # get launch anchor
-        # before switch, bnd_sides_right is split at idx
-        LaunchAnchor <- bnd_sides_right[nrow(bnd_sides_right), ]
+        LaunchAnchor_idx <- nrow(pnts_i_bnd)/2
+        LaunchAnchor_idx <- round(LaunchAnchor_idx)
+        LaunchAnchor_idx <- min(LaunchAnchor_idx, nrow(pnts_i_bnd))
+        LaunchAnchor_idx <- max(LaunchAnchor_idx, 1)
+        # get launch anchor
+        LaunchAnchor <- pnts_i_bnd[LaunchAnchor_idx, ]
       }
       else {
         #
         # get, for end group
-        if (Finalization) { GrpBndAgl_distal <- GrpBndAgl }
-        else { 
-          GrpBndAgl_distal <- NULL 
-          }
+        if (BoolDirection) { GrpBndAgl_distal <- GrpBndAgl }
+        else { GrpBndAgl_distal <- NULL }
+        #
+        # need a switch
+        if (pnts_i_bnd_ascending[1, "IDB"] == bnd_sides_left[1, "IDB"]) {
+          #
+          # switch
+          bnd_sides_left0 <- bnd_sides_left
+          bnd_sides_left <- bnd_sides_right
+          bnd_sides_right <- bnd_sides_left0
+        }
       }
+      #
+      # get bnd sides
+      list_pnts_i_bnd_sides <- list(bnd_sides_right, bnd_sides_left)
     }
     else {
       #
       # get bnd sides
       list_pnts_i_bnd_sides <- f_pnts_bnd_sides(pnts_i_bnd, IDB_max)
+      #
+      # switch
+      list_pnts_i_bnd_sides <- f_pnts_bnd_sides_switch2(list_pnts_i_bnd_sides, LaunchAnchor, IDB_max)
     }
-    #
-    # switch
-    list_pnts_i_bnd_sides <- f_pnts_bnd_sides_switch2(list_pnts_i_bnd_sides, LaunchAnchor, IDB_max)
     # #
     # # debugging
     # f_pnts_save_points(LaunchAnchor, NA, "LaunchAnchor")
@@ -3299,6 +3251,9 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       # check
       if ((pnts_i_bnd_sides_corners_check[2] == F)) {
         #
+        # message
+        message("Error: invalid corners.")
+        #
         # return
         return(NULL)
       }
@@ -3307,6 +3262,9 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       #
       # check
       if ((pnts_i_bnd_sides_corners_check[1] == F)) {
+        #
+        # message
+        message("Error: invalid corners.")
         #
         # return
         return(NULL)
@@ -3317,6 +3275,9 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
       # check
       if ((pnts_i_bnd_sides_corners_check[1] == F) ||
           (pnts_i_bnd_sides_corners_check[2] == F)) {
+        #
+        # message
+        message("Error: invalid corners.")
         #
         # return
         return(NULL)
@@ -3336,8 +3297,8 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithm, Finalizatio
     }
     else {
       #
-      # error
-      warning("Error: pnts do not have 2 bnd sides.")
+      # message
+      message("Error: pnts do not have 2 bnd sides.")
       #
       # return
       return(NULL)
@@ -3505,8 +3466,8 @@ f_pnts_path_extending <- function(pnts, pPolygons) {
     f_pnts_save_points(pnts_line, NA, "pnts_line")
     f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
     #
-    # warning
-    warning("Warning: no intscts gotten.")
+    # message
+    message("Error: no intscts gotten.")
     #
     # return
     return(NULL)
@@ -3555,6 +3516,15 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
       # get bnd sides for a group
       list_bnd_sides <- list(list_bnd_sides_right[[i]], list_bnd_sides_left[[i]])
       #
+      # debugging, check if right and left is on the right and left
+      if (F) {
+        #
+        # debugging
+        f_pnts_save_points(column_anchors, NA, "column_anchors")
+        f_pnts_save_points(list_bnd_sides_right[[2]], NA, "bnd_sides_right")
+        f_pnts_save_points(list_bnd_sides_left[[2]], NA, "bnd_sides_left")
+      }
+      #
       # get bnd sides corners()
       bnd_sides_corners <- f_pnts_bnd_sides_corners(list_bnd_sides)
       #
@@ -3580,12 +3550,16 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
         if (is.null(ints_upper)) {
           #
           # debugging
+          f_pnts_save_points(column_anchors, NA, "column_anchors")
+          f_pnts_save_points(list_bnd_sides_right[[i]], NA, "bnd_sides_right")
+          f_pnts_save_points(list_bnd_sides_left[[i]], NA, "bnd_sides_left")
+          # debugging
           f_pnts_save_points(pnts_curve_profile, NA, "pnts_curve_profile")
-          f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
+          # f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
           f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
           #
-          # warning
-          warning("Error: get intersection failed.")
+          # message
+          message("Error: get intersection failed.")
           #
           # return
           return(NULL)
@@ -3614,12 +3588,16 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
         if (is.null(ints_lower)) {
           #
           # debugging
+          f_pnts_save_points(column_anchors, NA, "column_anchors")
+          f_pnts_save_points(list_bnd_sides_right[[i]], NA, "bnd_sides_right")
+          f_pnts_save_points(list_bnd_sides_left[[i]], NA, "bnd_sides_left")
+          # debugging
           f_pnts_save_points(pnts_curve_profile, NA, "pnts_curve_profile")
           f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
-          f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
+          # f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
           #
-          # warning
-          warning("Error: get intersection failed.")
+          # message
+          message("Error: get intersection failed.")
           #
           # return
           return(NULL)
@@ -3650,12 +3628,16 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
         if (is.null(ints_lower)) {
           #
           # debugging
+          f_pnts_save_points(column_anchors, NA, "column_anchors")
+          f_pnts_save_points(list_bnd_sides_right[[i]], NA, "bnd_sides_right")
+          f_pnts_save_points(list_bnd_sides_left[[i]], NA, "bnd_sides_left")
+          # debugging
           f_pnts_save_points(pnts_curve_profile, NA, "pnts_curve_profile")
           f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
-          f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
+          # f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
           #
-          # warning
-          warning("Error: get intersection failed.")
+          # message
+          message("Error: get intersection failed.")
           #
           # return
           return(NULL)
@@ -3686,12 +3668,16 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
         if (is.null(ints_upper)) {
           #
           # debugging
+          f_pnts_save_points(column_anchors, NA, "column_anchors")
+          f_pnts_save_points(list_bnd_sides_right[[i]], NA, "bnd_sides_right")
+          f_pnts_save_points(list_bnd_sides_left[[i]], NA, "bnd_sides_left")
+          # debugging
           f_pnts_save_points(pnts_curve_profile, NA, "pnts_curve_profile")
-          f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
+          # f_pnts_save_points(pnts_curve_grp_bnd_lower, NA, "pnts_curve_grp_bnd_lower")
           f_pnts_save_points(pnts_curve_grp_bnd_upper, NA, "pnts_curve_grp_bnd_upper")
           #
-          # warning
-          warning("Error: get intersection failed.")
+          # message
+          message("Error: get intersection failed.")
           #
           # return
           return(NULL)
@@ -4070,8 +4056,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
     # save
     f_pnts_save_points(column_anchors, NA, "column_anchors")
     #
-    # warning
-    warning("Error: f_pnts_path_lines returns null.")
+    # message
+    message("Error: f_pnts_path_lines returns null.")
     #
     # return
     return(NULL)
@@ -4166,6 +4152,16 @@ f_strips <- function(pPolygons, list_path, count_strip) {
   #
   # get clipping lines
   spldf_cls <- f_strips_clipping_polylines(pPolygons, strip_stations, strip_stations_angles)
+  #
+  # check
+  if (is.null(spldf_cls)) {
+    #
+    # message
+    message("Error: NULL spldf_cls.")
+    #
+    # return
+    return(NULL)
+  }
   #
   # debugging, output files
   if (F) {
@@ -4421,8 +4417,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
       # save
       f_pnts_save_points(strip_stations_for_sp, NA, "strip_stations_for_sp")
       #
-      # warning
-      warning("Error: count of POLYGON is not 2.")
+      # message
+      message("Error: count of POLYGON is not 2.")
       #
       # pause at here
       return(NULL)
@@ -4473,8 +4469,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
       # save
       f_save_list2sp(list(sfc_POLYGON1_sp, sfc_POLYGON2_sp), NULL, NA, "POLYGONs")
       #
-      # warning
-      warning("Error: pnt upper is in or not in both POLYGONs.")
+      # message
+      message("Error: pnt upper is in or not in both POLYGONs.")
       #
       # return
       return(NULL)
@@ -4529,8 +4525,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
       # save
       f_pnts_save_points(int.coords, NA, "int.coords")
       #
-      # warning
-      warning("Error: profile and strip do not have intersections.")
+      # message
+      message("Error: profile and strip do not have intersections.")
       #
       # return
       return(NULL)
@@ -4555,8 +4551,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
       # # save
       # f_pnts_save_points(int.coords, NA, "int.coords")
       #
-      # warning
-      warning("Error: profile and strip have more than 2 intersections.")
+      # message
+      message("Error: profile and strip have more than 2 intersections.")
       # #
       # # return
       # return(NULL)
@@ -4660,8 +4656,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
         # save
         f_pnts_save_points(int.coords, NA, "int.coords")
         #
-        # warning
-        warning("Error: profile and strip do not have 2 intersections.")
+        # message
+        message("Error: profile and strip do not have 2 intersections.")
         #
         # return
         return(NULL)
@@ -4800,8 +4796,8 @@ f_strips_clipping_polylines <- function(pPolygons, strip_stations, strip_station
       colnames(pPolygons_coords) <- c('Cx', 'Cy')
       f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
       #
-      # warning
-      warning("Warning: no intscts gotten.")
+      # message
+      message("Error: no intscts gotten.")
       #
       # return
       return(NULL)
@@ -4832,8 +4828,8 @@ f_strips_clipping_polylines <- function(pPolygons, strip_stations, strip_station
       colnames(pPolygons_coords) <- c('Cx', 'Cy')
       f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
       #
-      # warning
-      warning("Warning: no intscts gotten.")
+      # message
+      message("Error: no intscts gotten.")
       #
       # return
       return(NULL)
@@ -5125,8 +5121,8 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
       # check
       if (abs(area2d - column_Ahrzs[i, 1]) >= 10^-6) {
         #
-        # warning
-        warning("Error: horizontal areas are inconsistent.")
+        # message
+        message("Error: horizontal areas are inconsistent.")
         #
         # pause at here
         return(NULL)
@@ -5400,8 +5396,8 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
     # check
     if (nrow(strip_nodes2) != (nrow(strip_nodes) + nrow(column_ints_rmdp2_ordered))) {
       #
-      # warning
-      warning("Error: add intersections of triangles in nodes failed.")
+      # message
+      message("Error: add intersections of triangles in nodes failed.")
       #
       # pause at here
       return(NULL)
@@ -5726,8 +5722,8 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
       # save
       f_pnts_save_points(data.frame(Cx = node_x_extnd, Cy = node_y_extnd), NA, "strip_node_extnd")
       #
-      # warning
-      warning("Error: Czs (Cz surface) is zero.")
+      # message
+      message("Error: Czs (Cz surface) is zero.")
       #
       # pause at here
       return(NULL)
@@ -5848,8 +5844,8 @@ f_pnts_nearest_extending <- function(pnt0, pnts, extnd = Inf) {
   # debugging
   if (length(count_pnt) == 0) {
     #
-    # warning
-    warning("Error: count_pnt is of length zero.")
+    # message
+    message("Error: count_pnt is of length zero.")
     #
     # pause at here
     return(NULL)
@@ -6069,8 +6065,8 @@ f_intersection_curves <- function(pnts1, pnts2) {
   # if (is.na(int.pts) || is.nan(int.pts) || is.null(int.pts) || pracma::isempty(int.pts)) {
   if (is.null(int.pts) || pracma::isempty(int.pts)) {
     # #
-    # # warning
-    # warning("Warning: invalid intersection.")
+    # # message
+    # message("Error: invalid intersection.")
     #
     # return
     return(NULL)
@@ -6364,7 +6360,7 @@ f_pnts_save_proflle <- function(pnts_prfl, paras_strip, paras_input, CRS_out, fi
   paras <- f_pnts2paras_profile(pnts_prfl, paras_strip)
   #
   # get data.frame
-  paras_input <- data.frame(iMGPC = paras_input[1], iMGAD = paras_input[2], iMEAR = paras_input[3], iMEDA = paras_input[4], iEHAC = paras_input[5], iMSHL = paras_input[6])
+  paras_input <- data.frame(iMGPC = paras_input[1], iMGAD = paras_input[2], iMERI = paras_input[3], iMERD = paras_input[4], iEACI = paras_input[5], iEACD = paras_input[6], iMSHL = paras_input[7])
   #
   # get data_df, inputs leed paras
   data_df <- cbind(paras_input, data.frame(ID = LineID), paras)
@@ -6775,8 +6771,8 @@ f_save_list2sp <- function(list_sp, data_df, CRS_out, file_out) {
   # check
   else {
     #
-    # Warning
-    warning("Warning: not right type of sp (spatial).")
+    # message
+    message("Error: not right type of sp (spatial).")
   }
   #
   # get prj
