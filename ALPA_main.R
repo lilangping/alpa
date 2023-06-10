@@ -4156,6 +4156,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
   # check
   if (is.null(spldf_cls)) {
     #
+    # sometimes, profile will go through outside landslide polygon?
+    #
     # message
     message("Error: NULL spldf_cls.")
     #
@@ -4538,6 +4540,8 @@ f_strips <- function(pPolygons, list_path, count_strip) {
     #
     # debugging
     if (nrow(int.coords) >= 3) {
+      #
+      # sometimes, profile will go through outside landslide polygon?
       # #
       # # save
       # f_save_list2sp(list(strip_sp), NULL, NA, "strip")
@@ -4554,12 +4558,11 @@ f_strips <- function(pPolygons, list_path, count_strip) {
       # message
       message("Error: profile and strip have more than 2 intersections.")
       # #
-      # # return
-      # return(NULL)
+      # # keep the first and last intersections?
+      # int.coords <- int.coords[c(1, nrow(int.coords)), ]
       #
-      # keep the first and last intersections?
-      # sometimes, profile will go through outside landslide polygon?
-      int.coords <- int.coords[c(1, nrow(int.coords)), ]
+      # return
+      return(NULL)
     }
     #
     # get index
