@@ -3461,10 +3461,10 @@ f_pnts_path_extending <- function(pnts, pPolygons) {
   #
   # debugging
   if (is.null(ints)) {
-    #
-    # debugging
-    f_pnts_save_points(pnts_line, NA, "pnts_line")
-    f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
+    # #
+    # # debugging
+    # f_pnts_save_points(pnts_line, NA, "pnts_line")
+    # f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
     #
     # message
     message("Error: no intscts gotten.")
@@ -4782,19 +4782,19 @@ f_strips_clipping_polylines <- function(pPolygons, strip_stations, strip_station
     #
     # debugging
     if (is.null(pCoords1)) {
-      #
-      # debugging
-      f_pnts_save_points(strip_stations, NA, "strip_stations")
-      #
-      # debugging
-      pnts_line1 <- data.frame(pnts_line1)
-      colnames(pnts_line1) <- c('Cx', 'Cy')
-      f_pnts_save_points(pnts_line1, NA, "pnts_line1")
-      #
-      # debugging
-      pPolygons_coords <- data.frame(pPolygons_coords)
-      colnames(pPolygons_coords) <- c('Cx', 'Cy')
-      f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
+      # #
+      # # debugging
+      # f_pnts_save_points(strip_stations, NA, "strip_stations")
+      # #
+      # # debugging
+      # pnts_line1 <- data.frame(pnts_line1)
+      # colnames(pnts_line1) <- c('Cx', 'Cy')
+      # f_pnts_save_points(pnts_line1, NA, "pnts_line1")
+      # #
+      # # debugging
+      # pPolygons_coords <- data.frame(pPolygons_coords)
+      # colnames(pPolygons_coords) <- c('Cx', 'Cy')
+      # f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
       #
       # message
       message("Error: no intscts gotten.")
@@ -4814,19 +4814,19 @@ f_strips_clipping_polylines <- function(pPolygons, strip_stations, strip_station
     #
     # debugging
     if (is.null(pCoords2)) {
-      #
-      # debugging
-      f_pnts_save_points(strip_stations, NA, "strip_stations")
-      #
-      # debugging
-      pnts_line2 <- data.frame(pnts_line2)
-      colnames(pnts_line2) <- c('Cx', 'Cy')
-      f_pnts_save_points(pnts_line2, NA, "pnts_line2")
-      #
-      # debugging
-      pPolygons_coords <- data.frame(pPolygons_coords)
-      colnames(pPolygons_coords) <- c('Cx', 'Cy')
-      f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
+      # #
+      # # debugging
+      # f_pnts_save_points(strip_stations, NA, "strip_stations")
+      # #
+      # # debugging
+      # pnts_line2 <- data.frame(pnts_line2)
+      # colnames(pnts_line2) <- c('Cx', 'Cy')
+      # f_pnts_save_points(pnts_line2, NA, "pnts_line2")
+      # #
+      # # debugging
+      # pPolygons_coords <- data.frame(pPolygons_coords)
+      # colnames(pPolygons_coords) <- c('Cx', 'Cy')
+      # f_pnts_save_points(pPolygons_coords, NA, "pPolygons_coords")
       #
       # message
       message("Error: no intscts gotten.")
