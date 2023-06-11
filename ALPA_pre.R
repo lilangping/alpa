@@ -68,7 +68,9 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 #
 # 2. Please make sure all data have the same coordinate system.
 #
-# 3. The main function ALPA has the following inputs:
+# 3. Please make sure the resolution of the input DEM is integer.
+#
+# 4. The main function ALPA has the following inputs:
 #    -> FileDEM:              input DEM file, tif raster file is recommended.
 #    -> FileLandslides:       input polygon of landslide, shapefile vector file.
 #    -> MinGrpPntCnt:         minimum group point count.
@@ -81,7 +83,7 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 #    -> FilePrefix:           prefix for output files.
 #    -> OutputHrcl:           whether output hierarchical results/files, T or F (default).
 #
-# 4. The output points and profiles are two dimensional (2D).
+# 5. The output points and profiles are two dimensional (2D).
 #    3D (z-aware) points and profiles can be produced based on the output excel files,
 #    using software like ArcGIS.
 # 
