@@ -1453,6 +1453,16 @@ f_pnts_dip <- function(pnts) {
     return(NA)
   }
   #
+  # check
+  if (pnts_normal[1] == 0 && pnts_normal[2] == 0) {
+    #
+    # message
+    message("Warning: A fitted plane is horizontal.")
+    #
+    # use the dip of mother plane
+    return(c(pnts[1, "Dx"], pnts[1, "Dy"], pnts[1, "Dz"])) 
+  }
+  #
   # get plumb
   vector_plumb <- c(0, 0, -1)
   #
@@ -1461,7 +1471,7 @@ f_pnts_dip <- function(pnts) {
   pnts_strike <- f_vector_unit(pnts_strike)
   #
   # vertical normal (horizontal plane)
-  if (pnts_strike[1] ==0 && pnts_strike[2] == 0 && pnts_strike[3] ==0) { 
+  if (pnts_strike[1] == 0 && pnts_strike[2] == 0 && pnts_strike[3] == 0) { 
     #
     # message
     message("Warning: A fitted plane is horizontal.")
