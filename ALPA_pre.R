@@ -222,7 +222,8 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 # 3. Fix bugs in differentiating right and left boundaries.
 # 4. Consider the situation that anchors or profile are outside landslide polygon.
 # 5. Update the algorithm configuration for handling the initial and distal end group.
-# 6. Display warning and error messages.
+# 6. Fix a bug in fitting plane for sub- group pnts.
+# 7. Display warning and error messages.
 #
 #
 #
