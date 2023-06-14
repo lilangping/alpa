@@ -5265,14 +5265,10 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
     }
     #
     # check position, do not use equal, because of numerical error?
-    positions <- data.frame(which(column_agls == max(column_agls)))
+    positions <- which(column_agls == max(column_agls))
     #
-    # check count, possibly two positions have pi?
-    if (nrow(positions) >= 2) {
-      #
-      # choose one
-      positions <- positions[1, 1]
-    }
+    # possibly two positions have pi?
+    positions1idx <- positions[1]
     #
     # get dists
     column_dists_upper <- (Cx - strip_nodes[1:(count_node-1), "Cx"])^2
@@ -5295,7 +5291,7 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
     }
     #
     # check position, again
-    if(column_dists_relative_diff[positions[1, 1]] != min(column_dists_relative_diff)) {
+    if(column_dists_relative_diff[positions1idx] != min(column_dists_relative_diff)) {
       # #
       # # use relative difference, still not robust
       # # drop this unnecessary check?
@@ -5305,7 +5301,7 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
       # #
       # # save
       # f_pnts_save_points(int, NA, "int")
-      # #
+      #
       # warning
       warning("warning: position for ints found not consistent.")
       # #
@@ -5314,7 +5310,7 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
     }
     #
     # append
-    column_positions <- rbind(column_positions, positions[1, 1])
+    column_positions <- rbind(column_positions, positions1idx)
   }
   #
   # sort, for the first time
