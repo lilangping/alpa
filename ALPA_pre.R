@@ -219,11 +219,12 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 # Version 3.0 (June 09th, 2023)
 # 1. Remove the stop criterion based on deviation angle in sub- grouping end groups.
 # 2. Add a stop criterion based on point count ratio in sub- grouping end groups.
-# 3. Fix a bug in fitting plane for sub- group pnts.
-# 4. Fix bugs in differentiating right and left boundaries.
-# 5. Consider the situation that anchors or profile are outside landslide polygon.
-# 6. Update the algorithm configuration for handling the initial and distal end group.
-# 7. Display warning and error messages.
+# 3. Fix a bug in checking spatial contiguity
+# 4. Fix a bug in fitting plane for sub- group pnts.
+# 5. Fix bugs in differentiating right and left boundaries.
+# 6. Consider the situation that anchors or profile are outside landslide polygon.
+# 7. Update the algorithm configuration for handling the initial and distal end group.
+# 8. Display warning and error messages.
 #
 #
 #
