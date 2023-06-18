@@ -686,7 +686,8 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         #
         # no spatial contiguities, even after combination
         # possibly both list_clusters_upper and list_clusters_lower >= 2, ???
-        if (length(list_clusters_upper) >= 2 || length(list_clusters_lower) >= 2) {
+        if (is.null(list_clusters_upper) || is.null(list_clusters_lower) ||
+            length(list_clusters_upper) >= 2 || length(list_clusters_lower) >= 2) {
           #
           # set grpm
           grpm <- 1
@@ -1576,6 +1577,9 @@ f_pnts_clustering <- function(pnts, raster_cellsize, raster_CRS) {
   # initial list
   list_clusters <- list()
   #
+  # get pnts shp
+  pnts_shp <- f_pnts2shp_points(pnts, raster_CRS)
+  #
   # get polygons
   pnts_polygon <- f_pnts2shp_polygon_rasterized(pnts, raster_cellsize, raster_CRS)
   #
@@ -1611,8 +1615,97 @@ f_pnts_clustering <- function(pnts, raster_cellsize, raster_CRS) {
       # get ID
       pnts_polygon_sf_sparts_sp_ID <- pnts_polygon_sf_sparts_sp_ID + 1
       #
-      # get Polygon
-      pnts_polygon_sf_sparts_sp_pgn <- pnts_polygon_sf_sparts_sp[pnts_polygon_sf_sparts_sp_ID, ]
+      # debugging, try catch
+      if (F) {
+        #
+        # initial
+        out <- NA
+        #
+        # try catch
+        out <- tryCatch (
+          #
+          ########################################################
+          # Try part: define the expression(s) you want to "try" #
+          ########################################################
+          #
+          {
+            #
+            # Just to highlight: 
+            # If you want to use more than one R expression in the "try part" 
+            # then you'll have to use curly brackets. 
+            # Otherwise, just write the single expression you want to try and 
+            #
+            message("This is the 'try' part")
+            pnts_polygon_sf_sparts_sp_pgn <- pnts_polygon_sf_sparts_sp[pnts_polygon_sf_sparts_sp_ID, ]
+          },
+          #
+          ########################################################################
+          # Condition handler part: define how you want conditions to be handled #
+          ########################################################################
+          #
+          # Handler when a warning occurs:
+          warning = function(cond) {
+            #
+            message("Get warning:")
+            message("Here's the original warning message:")
+            message(cond)
+            #
+            # Choose a return value when such a type of condition occurs
+            return(NULL)
+          },
+          #
+          # Handler when an error occurs:
+          error = function(cond) {
+            #
+            # message
+            message("Get erros:")
+            message("Here's the original error message:")
+            message(cond)
+            #
+            # Choose a return value when such a type of condition occurs
+            return(NULL)
+          },
+          #
+          ###############################################
+          # Final part: define what should happen AFTER #
+          # everything has been tried and/or handled    #
+          ###############################################
+          #
+          finally = {
+            #
+            # if succeed
+            message("Process succeed\n")
+          }
+        )
+        #
+        # pause
+        if (is.null(out)) {
+          #
+          # pause at here
+          return(NA)
+        }
+      }
+      # #
+      # # get Polygon
+      # pnts_polygon_sf_sparts_sp_pgn <- pnts_polygon_sf_sparts_sp@polygons[[i]]@Polygons[[j]]
+      #
+      # check
+      if (pnts_polygon_sf_sparts_sp_ID <= length(pnts_polygon_sf_sparts_sp)) {
+        #
+        # get Polygon
+        pnts_polygon_sf_sparts_sp_pgn <- pnts_polygon_sf_sparts_sp[pnts_polygon_sf_sparts_sp_ID, ]
+      }
+      else {
+        # #
+        # # save
+        # f_pnts_save_points(pnts, raster_CRS, "pnts")
+        # #
+        # # write
+        # rgdal::writeOGR(pnts_polygon, dsn = ".", layer = "pnts_polygon", overwrite = T, driver="ESRI Shapefile")
+        #
+        # return
+        return(NULL)
+      }
       #
       # debugging
       if (F) {
@@ -1620,9 +1713,6 @@ f_pnts_clustering <- function(pnts, raster_cellsize, raster_CRS) {
         # plot polygon
         plot(pnts_polygon_sf_sparts_sp_pgn, main = "polygon", axes = TRUE, border = "red", add = TRUE)
       }
-      #
-      # get pnts shp
-      pnts_shp <- f_pnts2shp_points(pnts, raster_CRS)
       # #
       # # for debugging
       # print(projection(crs(pnts_shp)))
@@ -3734,7 +3824,7 @@ f_pnts_path_lines <- function(list_bnd_sides_right, list_bnd_sides_left, column_
     column_anchors_GrpBndInts[i, "Lhrz"] <- 
       column_anchors_GrpBndInts[i-1, "Lhrz"] + 
       sqrt((column_anchors_GrpBndInts[i, "Cx"] - column_anchors_GrpBndInts[i-1, "Cx"])^2 + 
-           (column_anchors_GrpBndInts[i, "Cy"] - column_anchors_GrpBndInts[i-1, "Cy"])^2)
+             (column_anchors_GrpBndInts[i, "Cy"] - column_anchors_GrpBndInts[i-1, "Cy"])^2)
   }
   #
   # get GrpBndInt, index
@@ -6614,18 +6704,18 @@ f_pnts2paras_profile <- function(pnts, paras_strip) {
   #
   # get tortuosity overall
   d_overall <- sqrt((pnts[count_pnts, "Cx"] - pnts[1, "Cx"])^2 + 
-                    (pnts[count_pnts, "Cy"] - pnts[1, "Cy"])^2 +
-                    (pnts[count_pnts, "Cz"] - pnts[1, "Cz"])^2)
+                      (pnts[count_pnts, "Cy"] - pnts[1, "Cy"])^2 +
+                      (pnts[count_pnts, "Cz"] - pnts[1, "Cz"])^2)
   T_overall <- s_profile / d_overall
   #
   # get tortuosity horizontal
   d_horizontal <- sqrt((pnts[count_pnts, "Cx"] - pnts[1, "Cx"])^2 + 
-                       (pnts[count_pnts, "Cy"] - pnts[1, "Cy"])^2)
+                         (pnts[count_pnts, "Cy"] - pnts[1, "Cy"])^2)
   T_horizontal <- l_profile / d_horizontal
   #
   # get tortuosity longitudinal
   d_longitudinal <- sqrt((l_profile)^2 +
-                         (h_profile)^2)
+                           (h_profile)^2)
   T_longitudinal <- s_profile / d_longitudinal
   #
   # initial
