@@ -6,9 +6,9 @@
 #                                                                        #
 #      An R-Script for for automatic analysis of landslide profile       #
 #                                                                        #
-#                             Version 3.0                                #
+#                             Version 3.1                                #
 #                                                                        #
-#                           June 09th, 2023                              #
+#                           July 20th, 2023                              #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -225,6 +225,9 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 # 6. Consider the situation that anchors or profile are outside landslide polygon.
 # 7. Update the algorithm configuration for handling the initial and distal end group.
 # 8. Display warning and error messages.
+#
+# Version 3.1 (July 20th, 2023)
+# 1. Update the algorithm for minimizing point count ratio of end groups.
 #
 #
 #
