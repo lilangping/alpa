@@ -6,9 +6,9 @@
 #                                                                        #
 #      An R-Script for for automatic analysis of landslide profile       #
 #                                                                        #
-#                             Version 3.0                                #
+#                             Version 3.1                                #
 #                                                                        #
-#                           June 09th, 2023                              #
+#                           July 20th, 2023                              #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -232,8 +232,158 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # subgrouping
   while (TRUE) {
     #
-    # append
-    list_list_pnts[[length(list_list_pnts)+1]] <- list_pnts
+    # get finalization
+    Finalization <- min(data.frame(list_grpm)) == 1
+    #
+    # merge end groups, if EndRto is small
+    if (Finalization) {
+      #
+      # save original
+      list_pnts0 <- list_pnts
+      #
+      # get
+      GrpCnt <- length(list_pnts0)
+      EndCnt <- nrow(list_pnts0[[1]])
+      idx_EndMerged <- 1
+      #
+      # check end groups, initial
+      for (i in 2:GrpCnt) {
+        #
+        # get pnts
+        pnts_i <- list_pnts0[[i]]
+        #
+        # get ratio for end group
+        EndCnt <- EndCnt + nrow(pnts_i)
+        EndRto <- EndCnt / nrow(pnts)
+        #
+        # check
+        if (EndRto > MinEndRtoInt) {
+          #
+          # when large than the minimum
+          # which is a little larger than the to-be-merged ratio
+          idx_EndMerged <- i-1
+          #
+          # break
+          break
+        }
+      }
+      #
+      # merge end groups, initial
+      if (idx_EndMerged > 1) {
+        #
+        # initial
+        list_pnts <- list()
+        #
+        # initial
+        pnts_initial <- list_pnts0[[1]]
+        #
+        # merge pnts
+        for (i in 2:idx_EndMerged) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # merge
+          pnts_initial <- rbind(pnts_initial, pnts_i)
+        }
+        #
+        # set pnts
+        pnts_initial[, "SMG"] <- "SGR"
+        pnts_initial[, "grp"] <- 1
+        #
+        # update list_pnts
+        list_pnts[[1]] <- pnts_initial
+        #
+        # update list_pnts
+        for (i in (idx_EndMerged+1):GrpCnt) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # set pnts
+          pnts_i[, "grp"] <- i-idx_EndMerged+1
+          #
+          # update list_pnts
+          list_pnts[[i-idx_EndMerged+1]] <- pnts_i
+        }
+        #
+        # list2pnts
+        pnts_split <- f_list2pnts(list_pnts)
+      }
+      #
+      # save original
+      list_pnts0 <- list_pnts
+      #
+      # get
+      GrpCnt <- length(list_pnts0)
+      EndCnt <- nrow(list_pnts0[[GrpCnt]])
+      idx_EndMerged <- GrpCnt
+      #
+      # check end groups, distal
+      for (i in ((GrpCnt-1):-1:1)) {
+        #
+        # get pnts
+        pnts_i <- list_pnts0[[i]]
+        #
+        # get ratio for end group
+        EndCnt <- EndCnt + nrow(pnts_i)
+        EndRto <- EndCnt / nrow(pnts)
+        #
+        # check
+        if (EndRto > MinEndRtoInt) {
+          #
+          # when large than the minimum
+          # which is a little larger than the to-be-merged ratio
+          idx_EndMerged <- i+1
+          #
+          # break
+          break
+        }
+      }
+      #
+      # merge end groups, distal
+      if (idx_EndMerged < GrpCnt) {
+        #
+        # initial
+        list_pnts <- list()
+        #
+        # update list_pnts
+        for (i in 1:(idx_EndMerged-1)) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # set pnts
+          pnts_i[, "grp"] <- i
+          #
+          # update list_pnts
+          list_pnts[[i]] <- pnts_i
+        }
+        #
+        # distal
+        pnts_distal <- list_pnts0[[idx_EndMerged]]
+        #
+        # merge pnts
+        for (i in (idx_EndMerged+1):GrpCnt) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # merge
+          pnts_distal <- rbind(pnts_distal, pnts_i)
+        }
+        #
+        # set pnts
+        pnts_distal[, "SMG"] <- "SGR"
+        pnts_distal[, "grp"] <- idx_EndMerged
+        #
+        # update list_pnts
+        list_pnts[[idx_EndMerged]] <- pnts_distal
+        #
+        # list2pnts
+        pnts_split <- f_list2pnts(list_pnts)
+      }
+    }
     #
     # save, for every split
     if (OutputHrcl) {
@@ -261,8 +411,8 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
       f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
     }
     #
-    # get finalization
-    Finalization <- min(data.frame(list_grpm)) == 1
+    # append
+    list_list_pnts[[length(list_list_pnts)+1]] <- list_pnts
     #
     # save, and break, if no group need split
     if (Finalization) {
