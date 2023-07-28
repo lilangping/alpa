@@ -330,7 +330,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         EndRto <- EndCnt / nrow(pnts)
         #
         # check
-        if (EndRto > MinEndRtoInt) {
+        if (EndRto > MinEndRtoDit) {
           #
           # when large than the minimum
           # which is a little larger than the to-be-merged ratio
