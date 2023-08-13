@@ -228,6 +228,7 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 #
 # Version 3.1 (July 20th, 2023)
 # 1. Update the algorithm for minimizing point count ratio of end groups.
+# 2. Fix a bug in handling the end group with the quad algorithm.
 #
 #
 #

@@ -391,6 +391,30 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
       # get path (centers and bnd sides)
       list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, F)
       #
+      # check
+      if (list_pnts_path == 1) {
+        #
+        # message
+        message("Warning: replace quad with mbb.")
+        #
+        # replace quad with mbb
+        if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+        if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+        if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, F) }
+        if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+      }
+      if (list_pnts_path == 2) {
+        #
+        # message
+        message("Warning: replace quad with mbb.")
+        #
+        # replace quad with mbb
+        if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+        if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+        if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, F) }
+        if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+      }
+      #
       # get centers
       pnts_split_anchors <- list_pnts_path[[1]]
       #
@@ -434,6 +458,30 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         #
         # get path (centers and bnd sides)
         list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, T)
+        #
+        # check
+        if (list_pnts_path == 1) {
+          #
+          # message
+          message("Warning: replace quad with mbb.")
+          #
+          # replace quad with mbb
+          if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
+          if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
+          if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, T) }
+          if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
+        }
+        if (list_pnts_path == 2) {
+          #
+          # message
+          message("Warning: replace quad with mbb.")
+          #
+          # replace quad with mbb
+          if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
+          if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
+          if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, T) }
+          if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
+        }
         # #
         # # show step time
         # f_show_time(paste("f_pnts_path done.", "\n", sep = ""), time_step_start)
@@ -1150,6 +1198,30 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           #
           # get path (centers and bnd sides)
           list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, pEndAgrCfgInt, pEndAgrCfgDit, F)
+          #
+          # check
+          if (list_pnts_path == 1) {
+            #
+            # message
+            message("Warning: replace quad with mbb.")
+            #
+            # replace quad with mbb
+            if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+            if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+            if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, F) }
+            if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
+          }
+          if (list_pnts_path == 2) {
+            #
+            # message
+            message("Warning: replace quad with mbb.")
+            #
+            # replace quad with mbb
+            if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+            if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+            if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, F) }
+            if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
+          }
           # #
           # # show step
           # time_step_start <- f_show_step(paste("Check group corners start.", "\n", sep = ""))
@@ -3505,7 +3577,8 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
         message("Error: invalid corners.")
         #
         # return
-        return(NULL)
+        # return(NULL)
+        return(1)
       }
     }
     else if (i == count_pnts) {
@@ -3517,7 +3590,8 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
         message("Error: invalid corners.")
         #
         # return
-        return(NULL)
+        # return(NULL)
+        return(2)
       }
     }
     else {
