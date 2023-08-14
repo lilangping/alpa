@@ -2451,22 +2451,26 @@ f_pnts_bnd_end_even <- function(pnts, pnts0, BoolInitial = T) {
     # debugging
     if (sum(column_count_diff_around_zero == 1) > 1) {
       #
-      # get pnts_curve
-      pnts_curve_segment <- rbind(as.numeric(pnt0))
+      # just use the last pnt pair with difference around zero
       #
-      # get
-      colnames(pnts_curve_segment) <- c("Cx", "Cy")
-      pnts_curve_segment <- data.frame(pnts_curve_segment)
-      #
-      # debugging
-      f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
-      f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
+      # #
+      # # get pnts_curve
+      # pnts_curve_segment <- rbind(as.numeric(pnt0))
+      # #
+      # # get
+      # colnames(pnts_curve_segment) <- c("Cx", "Cy")
+      # pnts_curve_segment <- data.frame(pnts_curve_segment)
+      # #
+      # # debugging
+      # f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
+      # f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
       #
       # message
-      message("Error: more than one pnt pair with difference around zero.")
-      #
-      # return
-      return(NULL)
+      # message("Error: more than one pnt pair with difference around zero.")
+      message("Warning: more than one pnt pair with difference around zero.")
+      # #
+      # # return
+      # return(NULL)
     }
     #
     # do not have one pair around zero, use min
