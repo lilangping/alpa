@@ -4,11 +4,11 @@
 #                                                                        #
 #                                ALPA                                    #
 #                                                                        #
-#      An R-Script for for automatic analysis of landslide profile       #
+#       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 3.1                                #
+#                             Version 4.0                                #
 #                                                                        #
-#                           July 20th, 2023                              #
+#                          November 4th, 2023                            #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -25,27 +25,12 @@
 #
 #
 #
-ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, MinEndRtoInt = 0, MinEndRtoDit = 0, EndAgrCfgInt = 3, EndAgrCfgDit = 3, MinStpHrzLen = 30, FilePrefix = "", OutputHrcl = F) {
+ALPA <- function(FileDEM, FileLandslides, FileParameters = 0, CfgEndAnchorsInt = 1, CfgEndAnchorsDit = 1, CfgEndStripsInt = 1, CfgEndStripsDit = 1, OutputHrcl = F) {
   #
-  # check input
-  if (dendextend::is.natural.number(MinGrpPntCnt) == F) {
-    #
-    # message
-    message("Error: MinGrpPntCnt is not a natural number.")
-    #
-    # return
-    return(NA)
-  }
-  #
-  # check input
-  if (MinGrpAcrDst < 0) {
-    #
-    # message
-    message("Error: MinGrpAcrDst is negative.")
-    #
-    # return
-    return(NA)
-  }
+  # get raster
+  raster_dem <- raster::raster(FileDEM)
+  # get CRS
+  raster_CRS <- sp::proj4string(raster_dem)
   #
   # import vector layer
   shp_lasld <- rgdal::readOGR(FileLandslides)
@@ -56,16 +41,117 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
   # get count
   count_polygons <- length(list_polygons)
   #
+  # get Parameters
+  if (FileParameters != 0) {
+    #
+    # read xlsx
+    paras <- read.xlsx(FileParameters, 1, header = TRUE)
+  }
+  #
+  # get EndAnchorsInt
+  if (is.character(CfgEndAnchorsInt)) {
+    #
+    # read shapefile
+    shp_EndAnchorsInt <- rgdal::readOGR(CfgEndAnchorsInt)
+    #
+    # get coords
+    coords_EndAnchorsInt <- shp_EndAnchorsInt@coords
+  }
+  #
+  # get EndAnchorsDit
+  if (is.character(CfgEndAnchorsDit)) {
+    #
+    # read shapefile
+    shp_EndAnchorsDit <- rgdal::readOGR(CfgEndAnchorsDit)
+    #
+    # get coords
+    coords_EndAnchorsDit <- shp_EndAnchorsDit@coords
+  }
+  #
+  # get EndStripsInt
+  if (is.character(CfgEndStripsInt)) {
+    #
+    # read shapefile
+    shp_EndStripsInt <- rgdal::readOGR(CfgEndStripsInt)
+    #
+    # get lines
+    list_lines <- shp_EndStripsInt@lines
+    #
+    # get count
+    count_lines <- length(list_lines)
+    #
+    # initial
+    directions_EndStripsInt <- c()
+    #
+    # get directions
+    for (i in 1:count_lines) {
+      #
+      # get Lines
+      pLines <- list_lines[[i]]
+      #
+      # get coords
+      coords <- pLines@Lines[[1]]@coords
+      #
+      # get direction
+      derection <- atan2(coords[2, 2]-coords[1, 2], coords[2, 1]-coords[1, 1])
+      #
+      # debugging
+      if (derection < 0) {
+        #
+        # positive
+        derection <- derection + pi * 2
+      }
+      #
+      # append
+      directions_EndStripsInt <- rbind(directions_EndStripsInt, derection)
+    }
+  }
+  #
+  # get EndStripsDit
+  if (is.character(CfgEndStripsDit)) {
+    #
+    # read shapefile
+    shp_EndStripsDit <- rgdal::readOGR(CfgEndStripsDit)
+    #
+    # get lines
+    list_lines <- shp_EndStripsDit@lines
+    #
+    # get count
+    count_lines <- length(list_lines)
+    #
+    # initial
+    directions_EndStripsDit <- c()
+    #
+    # get directions
+    for (i in 1:count_lines) {
+      #
+      # get Lines
+      pLines <- list_lines[[i]]
+      #
+      # get coords
+      coords <- pLines@Lines[[1]]@coords
+      #
+      # get direction
+      derection <- atan2(coords[2, 2]-coords[1, 2], coords[2, 1]-coords[1, 1])
+      #
+      # debugging
+      if (derection < 0) {
+        #
+        # positive
+        derection <- derection + pi * 2
+      }
+      #
+      # append
+      directions_EndStripsDit <- rbind(directions_EndStripsDit, derection)
+    }
+  }
+  #
   # initial list_spldf_profile
   list_spldf_profile <- list()
   #
-  # get CRS
-  raster_dem <- raster::raster(FileDEM)
-  raster_CRS <- sp::proj4string(raster_dem)
-  #
   # get file
-  file_out_profile <- paste(FilePrefix, "_lsd_profile2d", sep = "", collapse = NULL)
-  file_out_xlsx <- paste(FilePrefix, "_lsd_profile2d.xlsx", sep = "", collapse = NULL)
+  file_out_profile <- paste(gsub(".shp", "", FileLandslides), "_paths2d", sep = "", collapse = NULL)
+  file_out_xlsx <- paste(gsub(".shp", "", FileLandslides), "_paths2d.xlsx", sep = "", collapse = NULL)
   #
   # split
   for (i in 1:count_polygons) {
@@ -76,11 +162,129 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
     # show progress
     # cat( paste("Process the ", as.character(i), "/", as.character(count_polygons), " landslide start.", "\n", sep = "") )
     #
-    # get polygons
+    # get Polygons
     pPolygons <- list_polygons[[i]]
     #
+    # get Parameters
+    if (FileParameters == 0) {
+      #
+      # get Parameters, default
+      pFilePrefix <- paste("lsd", sprintf("%06d", i), sep = "", collapse = NULL)
+      pMinGrpPntCnt <- 3
+      pMinGrpAcrDst <- 0
+      pMinStpHrzLen <- 30
+      pMinEndRtoInt <- 0.00
+      pMinEndRtoDit <- 0.00
+      #
+      # get Name
+      iName <- pFilePrefix
+    }
+    else {
+      #
+      # get Parameters
+      pFilePrefix <- paras[i, 1]
+      pMinGrpPntCnt <- paras[i, 2]
+      pMinGrpAcrDst <- paras[i, 3]
+      pMinStpHrzLen <- paras[i, 4]
+      pMinEndRtoInt <- paras[i, 5]
+      pMinEndRtoDit <- paras[i, 6]
+      #
+      # get Name
+      iName <- pFilePrefix
+    }
+    #
+    # get EndAnchorsInt
+    if (is.character(CfgEndAnchorsInt)) {
+      #
+      pEndAnchorsInt <- c(coords_EndAnchorsInt[i, 1], coords_EndAnchorsInt[i, 2])
+    }
+    else {
+      #
+      # debugging
+      if (CfgEndAnchorsInt != 1 && CfgEndAnchorsInt != 2 && CfgEndAnchorsInt != 3) {
+        #
+        # message
+        message("Error: wrong input of CfgEndAnchorsInt.")
+      }
+      #
+      # negative, to distinguish from direction values.
+      pEndAnchorsInt <- -CfgEndAnchorsInt
+    }
+    #
+    # get EndAnchorsDit
+    if (is.character(CfgEndAnchorsDit)) {
+      #
+      pEndAnchorsDit <- c(coords_EndAnchorsDit[i, 1], coords_EndAnchorsDit[i, 2])
+    }
+    else {
+      #
+      # debugging
+      if (CfgEndAnchorsDit != 1 && CfgEndAnchorsDit != 2 && CfgEndAnchorsDit != 3) {
+        #
+        # message
+        message("Error: wrong input of CfgEndAnchorsDit.")
+      }
+      #
+      # negative, to distinguish from direction values.
+      pEndAnchorsDit <- -CfgEndAnchorsDit
+    }
+    #
+    # get EndStripsInt
+    if (is.character(CfgEndStripsInt)) {
+      #
+      pEndStripsInt <- directions_EndStripsInt[i, ]
+    }
+    else {
+      #
+      # debugging
+      if (CfgEndStripsInt != 1 && CfgEndStripsInt != 2 && CfgEndStripsInt != 3) {
+        #
+        # message
+        message("Error: wrong input of CfgEndStripsInt.")
+      }
+      #
+      # negative, to distinguish from direction values.
+      pEndStripsInt <- -CfgEndStripsInt
+    }
+    #
+    # get EndStripsDit
+    if (is.character(CfgEndStripsDit)) {
+      #
+      pEndStripsDit <- directions_EndStripsDit[i, ]
+    }
+    else {
+      #
+      # debugging
+      if (CfgEndStripsDit != 1 && CfgEndStripsDit != 2 && CfgEndStripsDit != 3) {
+        #
+        # message
+        message("Error: wrong input of CfgEndStripsDit.")
+      }
+      #
+      # negative, to distinguish from direction values.
+      pEndStripsDit <- -CfgEndStripsDit
+    }
+    #
+    # update FilePrefix
+    pFilePrefix <- paste(pFilePrefix, "_c", sprintf("%03d", pMinGrpPntCnt), sep = "", collapse = NULL)
+    pFilePrefix <- paste(pFilePrefix, "_d", sprintf("%03d", pMinGrpAcrDst), sep = "", collapse = NULL)
+    pFilePrefix <- paste(pFilePrefix, "_s", sprintf("%03d", pMinStpHrzLen), sep = "", collapse = NULL)
+    # update FilePrefix
+    pFilePrefix <- paste(pFilePrefix, "_eri", sprintf("%.4f", pMinEndRtoInt), sep = "", collapse = NULL)
+    pFilePrefix <- paste(pFilePrefix, "_erd", sprintf("%.4f", pMinEndRtoDit), sep = "", collapse = NULL)
+    # update FilePrefix
+    if (is.character(CfgEndAnchorsInt)) { pFilePrefix <- paste(pFilePrefix, "_eai", sprintf("%f", pEndAnchorsInt[1]), "&", sprintf("%f", pEndAnchorsInt[2]), sep = "", collapse = NULL) }
+    else { pFilePrefix <- paste(pFilePrefix, "_eai", sprintf("%01d", abs(pEndAnchorsInt)), sep = "", collapse = NULL) }
+    if (is.character(CfgEndAnchorsDit)) { pFilePrefix <- paste(pFilePrefix, "_ead", sprintf("%f", pEndAnchorsDit[1]), "&", sprintf("%f", pEndAnchorsDit[2]), sep = "", collapse = NULL) }
+    else { pFilePrefix <- paste(pFilePrefix, "_ead", sprintf("%01d", abs(pEndAnchorsDit)), sep = "", collapse = NULL) }
+    # update FilePrefix
+    if (is.character(CfgEndStripsInt)) { pFilePrefix <- paste(pFilePrefix, "_esi", sprintf("%f", pEndStripsInt * 180 / pi), sep = "", collapse = NULL) }
+    else { pFilePrefix <- paste(pFilePrefix, "_esi", sprintf("%01d", abs(pEndStripsInt)), sep = "", collapse = NULL) }
+    if (is.character(CfgEndStripsDit)) { pFilePrefix <- paste(pFilePrefix, "_esd", sprintf("%f", pEndStripsDit * 180 / pi), sep = "", collapse = NULL) }
+    else { pFilePrefix <- paste(pFilePrefix, "_esd", sprintf("%01d", abs(pEndStripsDit)), sep = "", collapse = NULL) }
+    #
     # split using one polygons
-    spldf_profile <- f_lasld_split(raster_dem, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen, FilePrefix, i, OutputHrcl)
+    spldf_profile <- f_lasld_split(raster_dem, pPolygons, iName, pFilePrefix, pMinGrpPntCnt, pMinGrpAcrDst, pMinStpHrzLen, pMinEndRtoInt, pMinEndRtoDit, pEndAnchorsInt, pEndAnchorsDit, pEndStripsInt, pEndStripsDit, OutputHrcl)
     #
     # update list
     if (is.null(spldf_profile) == F) {
@@ -113,7 +317,7 @@ ALPA <- function(FileDEM, FileLandslides, MinGrpPntCnt = 3, MinGrpAcrDst = 0, Mi
 #
 #
 #
-f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen, FilePrefix, FileID, OutputHrcl) {
+f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt, MinGrpAcrDst, MinStpHrzLen, MinEndRtoInt, MinEndRtoDit, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, OutputHrcl) {
   # #
   # # show step
   # time_step_start <- f_show_step(paste("Read pnts start.", "\n", sep = ""))
@@ -138,7 +342,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # plot(shp_lasld, main = "polygon", axes = TRUE, border = "blue")
   #
   # set possible file_out (for the line of rasterized landslide plolygon)
-  file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_lsd_pln2d", sep = "", collapse = NULL)
+  file_out <- paste(FilePrefix, "_lsd_pln2d", sep = "", collapse = NULL)
   #
   # get
   pRasterDEM_masked <- list_polygon_rasterized[[2]]
@@ -153,15 +357,15 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   if (max(pnts[, "IDB"]) == 0) {
     #
     # message
-    str_failed <- paste("Error: Read pnts failed for the ", as.character(FileID), "th landslide.", sep = "", collapse = NULL)
+    str_failed <- paste("Error: Read landslide pnts failed.", sep = "", collapse = NULL)
     message(str_failed)
     #
     # save pnts
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts.xlsx", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts.xlsx", sep = "", collapse = NULL)
     f_pnts_save_xls(pnts, file_out)
     #
     # save shp
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts", sep = "", collapse = NULL)
     f_pnts_save_points(pnts, raster_CRS, file_out)
     #
     # return
@@ -175,11 +379,11 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   if (T) {
     #
     # save pnts
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts.xlsx", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts.xlsx", sep = "", collapse = NULL)
     f_pnts_save_xls(pnts, file_out)
     #
     # save shp
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts", sep = "", collapse = NULL)
     f_pnts_save_points(pnts, raster_CRS, file_out)
   }
   #
@@ -199,11 +403,11 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
     message("Warning: SMS is LSH")
     #
     # save pnts
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp.xlsx", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts_grp.xlsx", sep = "", collapse = NULL)
     f_pnts_save_xls(pnts_split, file_out)
     #
     # save shp
-    file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp", sep = "", collapse = NULL)
+    file_out <- paste(FilePrefix, "_pnts_grp", sep = "", collapse = NULL)
     f_pnts_save_points(pnts_split, raster_CRS, file_out)
     #
     # return
@@ -223,227 +427,218 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
   # get the maximum ID of the boundary points of the landslide
   IDB_max <- max(pnts_split[, "IDB"])
   #
-  # initial list_pnts, valid for maximum group count
-  list_pnts_ValidMax <- NULL
-  #
   # initial list_pnts, list
   list_list_pnts <- NULL
   #
   # subgrouping
   while (TRUE) {
     #
-    # get finalization
-    Finalization <- min(data.frame(list_grpm)) == 1
-    #
-    # merge end groups, if EndRto is small
-    if (Finalization) {
-      #
-      # save original
-      list_pnts0 <- list_pnts
-      #
-      # get
-      GrpCnt <- length(list_pnts0)
-      EndCnt <- nrow(list_pnts0[[1]])
-      idx_EndMerged <- 1
-      #
-      # check end groups, initial
-      for (i in 2:GrpCnt) {
-        #
-        # get pnts
-        pnts_i <- list_pnts0[[i]]
-        #
-        # get ratio for end group
-        EndCnt <- EndCnt + nrow(pnts_i)
-        EndRto <- EndCnt / nrow(pnts)
-        #
-        # check
-        if (EndRto > MinEndRtoInt) {
-          #
-          # when large than the minimum
-          # which is a little larger than the to-be-merged ratio
-          idx_EndMerged <- i-1
-          #
-          # break
-          break
-        }
-      }
-      #
-      # merge end groups, initial
-      if (idx_EndMerged > 1) {
-        #
-        # initial
-        list_pnts <- list()
-        #
-        # initial
-        pnts_initial <- list_pnts0[[1]]
-        #
-        # merge pnts
-        for (i in 2:idx_EndMerged) {
-          #
-          # get pnts
-          pnts_i <- list_pnts0[[i]]
-          #
-          # merge
-          pnts_initial <- rbind(pnts_initial, pnts_i)
-        }
-        #
-        # set pnts
-        pnts_initial[, "SMG"] <- "SGR"
-        pnts_initial[, "grp"] <- 1
-        #
-        # update list_pnts
-        list_pnts[[1]] <- pnts_initial
-        #
-        # update list_pnts
-        for (i in (idx_EndMerged+1):GrpCnt) {
-          #
-          # get pnts
-          pnts_i <- list_pnts0[[i]]
-          #
-          # set pnts
-          pnts_i[, "grp"] <- i-idx_EndMerged+1
-          #
-          # update list_pnts
-          list_pnts[[i-idx_EndMerged+1]] <- pnts_i
-        }
-        #
-        # list2pnts
-        pnts_split <- f_list2pnts(list_pnts)
-      }
-      #
-      # save original
-      list_pnts0 <- list_pnts
-      #
-      # get
-      GrpCnt <- length(list_pnts0)
-      EndCnt <- nrow(list_pnts0[[GrpCnt]])
-      idx_EndMerged <- GrpCnt
-      #
-      # check end groups, distal
-      for (i in ((GrpCnt-1):-1:1)) {
-        #
-        # get pnts
-        pnts_i <- list_pnts0[[i]]
-        #
-        # get ratio for end group
-        EndCnt <- EndCnt + nrow(pnts_i)
-        EndRto <- EndCnt / nrow(pnts)
-        #
-        # check
-        if (EndRto > MinEndRtoDit) {
-          #
-          # when large than the minimum
-          # which is a little larger than the to-be-merged ratio
-          idx_EndMerged <- i+1
-          #
-          # break
-          break
-        }
-      }
-      #
-      # merge end groups, distal
-      if (idx_EndMerged < GrpCnt) {
-        #
-        # initial
-        list_pnts <- list()
-        #
-        # update list_pnts
-        for (i in 1:(idx_EndMerged-1)) {
-          #
-          # get pnts
-          pnts_i <- list_pnts0[[i]]
-          #
-          # set pnts
-          pnts_i[, "grp"] <- i
-          #
-          # update list_pnts
-          list_pnts[[i]] <- pnts_i
-        }
-        #
-        # distal
-        pnts_distal <- list_pnts0[[idx_EndMerged]]
-        #
-        # merge pnts
-        for (i in (idx_EndMerged+1):GrpCnt) {
-          #
-          # get pnts
-          pnts_i <- list_pnts0[[i]]
-          #
-          # merge
-          pnts_distal <- rbind(pnts_distal, pnts_i)
-        }
-        #
-        # set pnts
-        pnts_distal[, "SMG"] <- "SGR"
-        pnts_distal[, "grp"] <- idx_EndMerged
-        #
-        # update list_pnts
-        list_pnts[[idx_EndMerged]] <- pnts_distal
-        #
-        # list2pnts
-        pnts_split <- f_list2pnts(list_pnts)
-      }
-    }
-    #
     # save, for every split
     if (OutputHrcl) {
       #
       # get path (centers and bnd sides)
-      list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, F)
+      list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, F)
       #
       # check
-      if (is.double(list_pnts_path)) {
+      if (is.null(list_pnts_path)) {
         #
-        #check
-        if (list_pnts_path == 1) {
-          #
-          # message
-          message("Warning: replace quad with mbb.")
-          #
-          # replace quad with mbb
-          if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-          if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-          if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, F) }
-          if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-        }
-        if (list_pnts_path == 2) {
-          #
-          # message
-          message("Warning: replace quad with mbb.")
-          #
-          # replace quad with mbb
-          if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-          if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-          if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, F) }
-          if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-        }
+        # message, if when reading pnts
+        message("Error: f_pnts_path return NULL.")
+        #
+        # return
+        return(NULL)
       }
       #
       # get centers
       pnts_split_anchors <- list_pnts_path[[1]]
       #
       # save pnts
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), ".xlsx", sep = "", collapse = NULL)
+      file_out <- paste(FilePrefix, "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), ".xlsx", sep = "", collapse = NULL)
       f_pnts_save_xls(pnts_split, file_out)
       #
       # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "", sep = "", collapse = NULL)
+      file_out <- paste(FilePrefix, "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "", sep = "", collapse = NULL)
       f_pnts_save_points(pnts_split, raster_CRS, file_out)
       #
       # save anchors
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_anchors.xlsx", sep = "", collapse = NULL)
+      file_out <- paste(FilePrefix, "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_anchors.xlsx", sep = "", collapse = NULL)
       f_pnts_save_xls(pnts_split_anchors, file_out)
       #
       # save shp
-      file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_anchors", sep = "", collapse = NULL)
+      file_out <- paste(FilePrefix, "_pnts_grps", sprintf("%03d", pnts_split[nrow(pnts_split), "grp"]), "_anchors", sep = "", collapse = NULL)
       f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
     }
     #
     # append
     list_list_pnts[[length(list_list_pnts)+1]] <- list_pnts
     #
+    # get finalization
+    Finalization <- min(data.frame(list_grpm)) == 1
+    #
     # save, and break, if no group need split
     if (Finalization) {
+      #
+      # DO NOT merge before Finalization,
+      # or, it will disturb the sequences of list_pntu and list_grpm.
+      # Then, the original list_pnts will be saved by OutputHrcl (if true),
+      # and, the possibly merged list_pnts will be saved in the final results.
+      #
+      # if EndRto is small, merge end groups, initial
+      if (length(list_pnts) >= 3) {
+        #
+        # save original
+        list_pnts0 <- list_pnts
+        #
+        # get
+        GrpCnt <- length(list_pnts0)
+        EndCnt <- nrow(list_pnts0[[1]])
+        idx_EndMerged <- 1
+        #
+        # check end groups, initial
+        for (i in 2:GrpCnt) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # get ratio for end group
+          EndCnt <- EndCnt + nrow(pnts_i)
+          EndRto <- EndCnt / nrow(pnts)
+          #
+          # check
+          if (EndRto > MinEndRtoInt) {
+            #
+            # when large than the minimum
+            # which is a little larger than the to-be-merged ratio
+            idx_EndMerged <- i-1
+            #
+            # break
+            break
+          }
+        }
+        #
+        # merge end groups, initial
+        if (idx_EndMerged > 1) {
+          #
+          # initial
+          list_pnts <- list()
+          #
+          # initial
+          pnts_initial <- list_pnts0[[1]]
+          #
+          # merge pnts
+          for (i in 2:idx_EndMerged) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # merge
+            pnts_initial <- rbind(pnts_initial, pnts_i)
+          }
+          #
+          # set pnts
+          pnts_initial[, "SMG"] <- "SGR"
+          pnts_initial[, "grp"] <- 1
+          #
+          # update list_pnts
+          list_pnts[[1]] <- pnts_initial
+          #
+          # update list_pnts
+          for (i in (idx_EndMerged+1):GrpCnt) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # set pnts
+            pnts_i[, "grp"] <- i-idx_EndMerged+1
+            #
+            # update list_pnts
+            list_pnts[[i-idx_EndMerged+1]] <- pnts_i
+          }
+          #
+          # list2pnts
+          pnts_split <- f_list2pnts(list_pnts)
+        }
+      }
+      #
+      # if EndRto is small, merge end groups, distal
+      if (length(list_pnts) >= 3) {
+        #
+        # save original
+        list_pnts0 <- list_pnts
+        #
+        # get
+        GrpCnt <- length(list_pnts0)
+        EndCnt <- nrow(list_pnts0[[GrpCnt]])
+        idx_EndMerged <- GrpCnt
+        #
+        # check end groups, distal
+        for (i in ((GrpCnt-1):-1:1)) {
+          #
+          # get pnts
+          pnts_i <- list_pnts0[[i]]
+          #
+          # get ratio for end group
+          EndCnt <- EndCnt + nrow(pnts_i)
+          EndRto <- EndCnt / nrow(pnts)
+          #
+          # check
+          if (EndRto > MinEndRtoDit) {
+            #
+            # when large than the minimum
+            # which is a little larger than the to-be-merged ratio
+            idx_EndMerged <- i+1
+            #
+            # break
+            break
+          }
+        }
+        #
+        # merge end groups, distal
+        if (idx_EndMerged < GrpCnt) {
+          #
+          # initial
+          list_pnts <- list()
+          #
+          # update list_pnts
+          for (i in 1:(idx_EndMerged-1)) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # set pnts
+            pnts_i[, "grp"] <- i
+            #
+            # update list_pnts
+            list_pnts[[i]] <- pnts_i
+          }
+          #
+          # distal
+          pnts_distal <- list_pnts0[[idx_EndMerged]]
+          #
+          # merge pnts
+          for (i in (idx_EndMerged+1):GrpCnt) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # merge
+            pnts_distal <- rbind(pnts_distal, pnts_i)
+          }
+          #
+          # set pnts
+          pnts_distal[, "SMG"] <- "SGR"
+          pnts_distal[, "grp"] <- idx_EndMerged
+          #
+          # update list_pnts
+          list_pnts[[idx_EndMerged]] <- pnts_distal
+          #
+          # list2pnts
+          pnts_split <- f_list2pnts(list_pnts)
+        }
+      }
+      #
+      # replace
+      list_list_pnts[[length(list_list_pnts)]] <- list_pnts
       #
       # initial idx
       idx_hierarchical <- length(list_list_pnts)
@@ -461,34 +656,16 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # time_step_start <- f_show_step(paste("f_pnts_path start.", "\n", sep = ""))
         #
         # get path (centers and bnd sides)
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, EndAgrCfgDit, T)
+        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, T)
         #
         # check
-        if (is.double(list_pnts_path)) {
+        if (is.null(list_pnts_path)) {
           #
-          # check
-          if (list_pnts_path == 1) {
-            #
-            # message
-            message("Warning: replace quad with mbb.")
-            #
-            # replace quad with mbb
-            if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
-            if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
-            if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, T) }
-            if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, T) }
-          }
-          if (list_pnts_path == 2) {
-            #
-            # message
-            message("Warning: replace quad with mbb.")
-            #
-            # replace quad with mbb
-            if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
-            if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
-            if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, T) }
-            if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, T) }
-          }
+          # message, if when reading pnts
+          message("Error: f_pnts_path return NULL.")
+          #
+          # return
+          return(NULL)
         }
         # #
         # # show step time
@@ -576,11 +753,11 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         message("Warning: SMS is SMO.")
         #
         # save pnts
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grp.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(pnts_split, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grp", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grp", sep = "", collapse = NULL)
         f_pnts_save_points(pnts_split, raster_CRS, file_out)
         #
         # return
@@ -611,51 +788,51 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         }
         #
         # save pnts
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(pnts_split, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps", sep = "", collapse = NULL)
         f_pnts_save_points(pnts_split, raster_CRS, file_out)
         #
         # save anchors
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_anchors.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(pnts_split_anchors, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_anchors", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_anchors", sep = "", collapse = NULL)
         f_pnts_save_points(pnts_split_anchors, raster_CRS, file_out)
         #
         # save strips
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(strip_df, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips", sep = "", collapse = NULL)
         f_save_list2sp(strip_sp, strip_df, raster_CRS, file_out)
         #
         # save strips
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_triangles.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(strip_triangle_df, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_triangles", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_triangles", sep = "", collapse = NULL)
         f_save_list2sp(strip_triangle_sp, strip_triangle_df, raster_CRS, file_out)
         #
         # save nodes
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_nodes.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(strip_nodes, file_out)
         #
         # save shp
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_nodes", sep = "", collapse = NULL)
         f_pnts_save_points(strip_nodes, raster_CRS, file_out)
         #
         # save shp pln
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d", sep = "", collapse = NULL)
-        spldf_profile <- f_pnts_save_proflle(strip_nodes, paras_strip, c(MinGrpPntCnt, MinGrpAcrDst, MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt, EndAgrCfgDit, MinStpHrzLen), raster_CRS, file_out, FileID)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_nodes_pln2d", sep = "", collapse = NULL)
+        spldf_profile <- f_pnts_save_proflle(strip_nodes, paras_strip, iName, MinGrpPntCnt, MinGrpAcrDst, MinStpHrzLen, MinEndRtoInt, MinEndRtoDit, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, raster_CRS, file_out)
         #
         # save paras
-        file_out <- paste(FilePrefix, "_lsd", sprintf("%06d", FileID), "_pnts_grps_strips_nodes_pln2d.xlsx", sep = "", collapse = NULL)
+        file_out <- paste(FilePrefix, "_pnts_grps_strips_nodes_pln2d.xlsx", sep = "", collapse = NULL)
         f_pnts_save_xls(spldf_profile@data, file_out)
         #
         # break
@@ -1098,6 +1275,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           pnts0_i_upper <- rbind(pnts_i_upper_bnd_ascending[1, c("Cx", "Cy")], pnts_i_upper_bnd_ascending[nrow(pnts_i_upper_bnd_ascending), c("Cx", "Cy")])
           #
           # get bnd sides
+          # list_end_pnts_i_upper <- f_pnts_bnd_end_even(pnts_i_upper, pnts0_i_upper, bool_initial)
           list_end_pnts_i_upper <- f_pnts_bnd_end_even(pnts_i_upper, pnts0_i_upper)
           #
           # check
@@ -1136,6 +1314,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
           pnts0_i_lower <- rbind(pnts_i_lower_bnd_ascending[nrow(pnts_i_lower_bnd_ascending), c("Cx", "Cy")], pnts_i_lower_bnd_ascending[1, c("Cx", "Cy")])
           #
           # get bnd sides
+          # list_end_pnts_i_lower <- f_pnts_bnd_end_even(pnts_i_lower, pnts0_i_lower, bool_initial)
           list_end_pnts_i_lower <- f_pnts_bnd_end_even(pnts_i_lower, pnts0_i_lower)
           #
           # check
@@ -1164,8 +1343,11 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
         # # show step time
         # f_show_time(paste("Check end group prolong done.", "\n", sep = ""), time_step_start)
         #
-        # only if MinGrpAcrDst is positive
-        if (MinGrpAcrDst > 0) {
+        # only if
+        # MinGrpAcrDst is positive
+        # or bool_initial 
+        # or bool_distal
+        if (bool_initial || bool_distal || MinGrpAcrDst > 0) {
           #
           # make a copy
           list_pnts_new_for_check <- list_pnts_new
@@ -1186,60 +1368,75 @@ f_lasld_split <- function(pRasterDEM, pPolygons, MinGrpPntCnt, MinGrpAcrDst, Min
             }
           }
           #
-          # set EndAgrCfgInt
-          # for saving time
-          # replace quad with mbb
-          # will influence anchor distance
-          # will not influence group corners check
-          pEndAgrCfgInt <- EndAgrCfgInt
-          if (EndAgrCfgInt == 1) { pEndAgrCfgInt <- 2}
-          if (EndAgrCfgInt == 4) { pEndAgrCfgInt <- 5}
-          #
-          # set EndAgrCfgDit
-          # for saving time
-          # replace quad with mbb
-          # will influence anchor distance
-          # will not influence group corners check
-          pEndAgrCfgDit <- EndAgrCfgDit
-          if (EndAgrCfgDit == 1) { pEndAgrCfgDit <- 2}
-          if (EndAgrCfgDit == 4) { pEndAgrCfgDit <- 5}
+          # will be VERY TIME-CONSUMING
+          # if do f_pnts_path in every splitting steps, using quad algorithm
+          # you can replace quad with mbb, for saving time
+          # but, as you will rarely use quad algorithm
+          # so, let it be
           #
           # get path (centers and bnd sides)
-          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, pEndAgrCfgInt, pEndAgrCfgDit, F)
-          #
-          # check
-          if (is.double(list_pnts_path)) {
-            #
-            # check
-            if (list_pnts_path == 1) {
-              #
-              # message
-              message("Warning: replace quad with mbb.")
-              #
-              # replace quad with mbb
-              if (EndAgrCfgInt == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-              if (EndAgrCfgInt == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-              if (EndAgrCfgInt == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 6, EndAgrCfgDit, F) }
-              if (EndAgrCfgInt == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, 5, EndAgrCfgDit, F) }
-            }
-            if (list_pnts_path == 2) {
-              #
-              # message
-              message("Warning: replace quad with mbb.")
-              #
-              # replace quad with mbb
-              if (EndAgrCfgDit == 1) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-              if (EndAgrCfgDit == 2) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-              if (EndAgrCfgDit == 3) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 6, F) }
-              if (EndAgrCfgDit == 4) { list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAgrCfgInt, 5, F) }
-            }
-          }
+          list_pnts_path <- f_pnts_path(list_pnts_new_for_check, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, F)
           # #
           # # show step
           # time_step_start <- f_show_step(paste("Check group corners start.", "\n", sep = ""))
           #
           # check
           if (is.null(list_pnts_path)) {
+            #
+            # check
+            if (bool_initial || bool_distal) {
+              #
+              # if using coords to split end groups
+              if ((bool_initial && (length(EndAnchorsInt) == 2)) ||
+                  (bool_distal && (length(EndAnchorsDit) == 2))) {
+                #
+                # set grpm
+                grpm <- 1
+                #
+                # set pnts_i
+                pnts_i[, "SMG"] <- "SGC"
+                pnts_i[, "grp"] <- grpu
+                #
+                # update list
+                list_pnts_new[[grpu]] <- pnts_i
+                list_pntu_new[[grpu]] <- pntu_i
+                list_grpm_new[[grpu]] <- grpm
+                #
+                # update the upper group
+                grpu <- grpu + 1
+                #
+                # continue
+                next
+              }
+              #
+              # if using coords, not
+              else {
+                #
+                # message
+                message("Warning: f_pnts_path return NULL for non- coords algorithm.")
+                #
+                # set grpm
+                grpm <- 1
+                #
+                # set pnts_i
+                pnts_i[, "SMG"] <- "SGC"
+                pnts_i[, "grp"] <- grpu
+                #
+                # update list
+                list_pnts_new[[grpu]] <- pnts_i
+                list_pntu_new[[grpu]] <- pntu_i
+                list_grpm_new[[grpu]] <- grpm
+                #
+                # update the upper group
+                grpu <- grpu + 1
+                #
+                # continue
+                next
+              }
+            }
+            #
+            # message
+            message("Warning: f_pnts_path return NULL for non- end groups.")
             #
             # set grpm
             grpm <- 1
@@ -2265,233 +2462,672 @@ f_pnts_bnd_sides_centerLs <- function(list_bnd_sides) {
 #
 #
 #
-f_pnts_bnd_end_even <- function(pnts, pnts0, BoolInitial = T) {
+f_pnts_bnd_end_coords <- function(pnts_bnd, pnts0, coords) {
   #
-  # do not use circular statistics
-  # just loop all the bnd pnts, to see which bnd pnt or bnd pair splits most equally
-  #
-  # also, check if the most equally bnd pnt is blocked by other bnd pnt
-  # straight flow path that crosses the bnd is not accepted
-  #
-  # it might be slightly slower than using circular statistics
-  # but much more robust and concise
-  #
-  # situation is very complex
-  # so, check unblocked for all bnd pnts
-  # although might cost more time, but more robust and concise
+  # get sorted
+  pnts_bnd <- f_pnts_bnd_ascending(pnts_bnd)
   #
   # get pnt0
   pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
   colnames(pnt0) <- c("Cx", "Cy")
   #
-  # initial, remove pnt0 from pnts, might be redundant
-  pnts_pnt0_rm <- c()
+  # get coords
+  coords <- data.frame(coords[1], coords[2])
+  colnames(coords) <- c("Cx", "Cy")
   #
-  # initial
-  pnts_angles <- c()
+  # get end_Anchor0
+  end_Anchor0 <- coords
   #
-  # get angles
-  for (i in 1:nrow(pnts)) {
-    #
-    # get xy
-    lx <- as.numeric(pnts[i, "Cx"] - pnt0[1])
-    ly <- as.numeric(pnts[i, "Cy"] - pnt0[2])
-    #
-    # if not the same
-    if (lx != 0 || ly != 0) {
-      #
-      # append
-      pnts_pnt0_rm <- rbind(pnts_pnt0_rm, pnts[i, ])
-      #
-      # get angle
-      pnts_angles <- c(pnts_angles, atan2(ly, lx))
-    }
-  }
+  # get split
+  list_split <- f_pnts_group_end_split(pnts_bnd, pnt0, end_Anchor0)
+  bnd_sides_right <- list_split[[1]]
+  bnd_sides_left <- list_split[[2]]
   #
-  # get bnd pnts
-  pnts_pnt0_rm_bnd <- pnts_pnt0_rm[which(pnts_pnt0_rm[, "IDB"] != 0), ]
+  # return
+  return(list(bnd_sides_right, bnd_sides_left))
+}
+#
+#
+#
+f_pnts_bnd_end_mbb <- function(pnts_bnd, pnts0) {
   #
   # get sorted
-  pnts_pnt0_rm_bnd_ascending <- f_pnts_bnd_ascending(pnts_pnt0_rm_bnd)
+  pnts_bnd <- f_pnts_bnd_ascending(pnts_bnd)
   #
-  # get pnts_curve, for bnd pnts
-  pnts_curve_bnd <- pnts_pnt0_rm_bnd_ascending[, c("Cx", "Cy")]
-  #
-  # get count
-  count_pnt_bnd <- nrow(pnts_curve_bnd)
-  #
-  # initial
-  pnts_angles_bnd <- c()
-  #
-  # get angles, for bnd pnts
-  for (i in 1:count_pnt_bnd) {
-    #
-    # get xy
-    lx <- as.numeric(pnts_curve_bnd[i, "Cx"] - pnt0[1])
-    ly <- as.numeric(pnts_curve_bnd[i, "Cy"] - pnt0[2])
-    #
-    # if not the same, theoretically will not happen here
-    if (lx != 0 || ly != 0) {
-      #
-      # get angle
-      pnts_angles_bnd <- c(pnts_angles_bnd, atan2(ly, lx))
-    }
-  }
-  #
-  # initial
-  column_count_diff <- c()
-  #
-  # get difference
-  for (i in 1:count_pnt_bnd) {
-    #
-    # get angle for bnd pnt
-    pnts_angles_bnd_i <- pnts_angles_bnd[i]
-    #
-    # initial
-    pnts_angles_sign <- pnts_angles - pnts_angles_bnd_i
-    #
-    # update
-    pnts_angles_sign[pnts_angles_sign > pi] <- pnts_angles_sign[pnts_angles_sign > pi] - pi*2
-    pnts_angles_sign[pnts_angles_sign < -pi] <- pnts_angles_sign[pnts_angles_sign < -pi] + pi*2
-    #
-    # update
-    pnts_angles_sign[pnts_angles_sign == pi] <- 0
-    pnts_angles_sign[pnts_angles_sign == -pi] <- 0
-    #
-    # get count
-    count_right <- sum(pnts_angles_sign < 0)
-    count_left <- sum(pnts_angles_sign > 0)
-    #
-    # get count diff
-    column_count_diff <- c(column_count_diff, count_right - count_left)
-  }
-  #
-  # initial
-  column_unblocked <- c()
-  #
-  # check blocked or not
-  for (i in 1:count_pnt_bnd) {
-    #
-    # get bnd pnt
-    pnt_bnd <- pnts_curve_bnd[i, ]
-    #
-    # get intersects
-    ints <- f_pnts_bnd_end_even_ints(pnts_curve_bnd, pnt0, pnt_bnd)
-    #
-    # if, or not, blocked by another bnd pnt
-    if (nrow(ints) == 1) { column_unblocked <- c(column_unblocked, 1) }
-    else { column_unblocked <- c(column_unblocked, 0) }
-  }
-  #
-  # initial ID split
-  ID_split_Ahead <- NA
-  ID_split_Behind <- NA
-  #
-  # get minimum absolute difference
-  diff_abs_min <- min(abs(column_count_diff[column_unblocked == 1]))
-  diff_abs_min_ID <- which((abs(column_count_diff) == diff_abs_min) & (column_unblocked == 1))
+  # get pnt0
+  pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
+  colnames(pnt0) <- c("Cx", "Cy")
   #
   # check
-  if (length(diff_abs_min_ID) == 0) {
+  if (nrow(pnts_bnd) == 3) {
     #
-    # possibly
-    # mostly because end group is too small
-    # for example, two bnd pnts, one internal pnts
-    # mark stop marker for group as "SGE"
-    #
-    # return
-    return(NA)
-  }
-  #
-  # check
-  if (column_count_diff[diff_abs_min_ID[1]] == 0) {
+    # get angle
+    agl <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
     #
     # check
-    if (length(diff_abs_min_ID) > 1) {
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    # #
+    # # get Agl0
+    # Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    # #
+    # # get angle, included
+    # agl_icld <- f_angle_included(Agl0, agl)
+    # #
+    # # check
+    # if (agl_icld > pi/2) { 
+    #   #
+    #   # reverse
+    #   agl <- agl - pi
+    # }
+    # #
+    # # check
+    # if (agl > pi) { agl <- agl - pi*2 }
+    # if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get agl and end_Anchor0
+    GrpBndAgl_end <- agl
+    end_Anchor0 <- data.frame(pnts_bnd[2, c("Cx", "Cy")])
+  }
+  else {
+    #
+    # convex hull, to reduce pnts
+    pnts_chull <- pnts_bnd[chull(pnts_bnd[, c("Cx", "Cy")]), ]
+    pnts_chull <- pnts_chull[, c("Cx", "Cy")]
+    #
+    # get mbb
+    colnames(pnts_chull) <- c("x", "y")
+    mbb <- shotGroups::getMinBBox(pnts_chull)
+    #
+    # get edges
+    mbb_edges <- mbb$pts
+    mbb_edges <- rbind(mbb_edges, mbb_edges[1, ])
+    colnames(mbb_edges) <- c("Cx", "Cy")
+    #
+    # debugging
+    if (F) {
+      #
+      # save
+      f_pnts_save_polylines(list(mbb_edges), NA, "mbb")
+    }
+    #
+    # get Agl0
+    Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # initial
+    column_agl <- c()
+    column_agl_icld <- c()
+    # 
+    # get, angle of edge
+    for (i in 1:4) {
+      #
+      # get angle
+      agl <- atan2(mbb_edges[i+1, "Cy"]-mbb_edges[i, "Cy"], mbb_edges[i+1, "Cx"]-mbb_edges[i, "Cx"])
+      #
+      # get angle, included
+      agl_icld <- f_angle_included(Agl0, agl)
+      #
+      # check
+      if (agl_icld > pi/2) { 
+        #
+        # reverse
+        agl <- agl - pi
+        agl_icld <- pi - agl_icld
+      }
+      #
+      # check
+      if (agl > pi) { agl <- agl - pi*2 }
+      if (agl < -pi) { agl <- agl + pi*2 }
+      #
+      # append
+      column_agl <- rbind(column_agl, agl)
+      column_agl_icld <- rbind(column_agl_icld, agl_icld)
+    }
+    #
+    # initial, middle pnts
+    column_mp <- c()
+    # 
+    # get, middle pnts
+    for (i in 1:4) {
+      #
+      # get coords
+      x <- (mbb_edges[i, "Cx"] + mbb_edges[i+1, "Cx"])/2
+      y <- (mbb_edges[i, "Cy"] + mbb_edges[i+1, "Cy"])/2
+      #
+      # append
+      column_mp <- rbind(column_mp, c(x, y))
+    }
+    #
+    # colnames
+    colnames(column_mp) <- c("Cx", "Cy")
+    column_mp <- data.frame(column_mp)
+    #
+    # get coords
+    x0 <- pnt0[1, "Cx"]
+    y0 <- pnt0[1, "Cy"]
+    #
+    # initial, distance
+    column_dist <- c()
+    # 
+    # get, distance
+    for (i in 1:4) {
+      #
+      # get coords
+      x <- column_mp[i, "Cx"]
+      y <- column_mp[i, "Cy"]
+      #
+      # get dist
+      dist <- sqrt((x - x0)^2 + (y - y0)^2)
+      #
+      # append
+      column_dist <- rbind(column_dist, dist)
+    }
+    #
+    # get idx
+    idxs <- which(column_agl_icld == min(column_agl_icld))
+    #
+    # owing to numerical errors
+    # possibly, two subtense have different included angles
+    if (length(idxs) == 1) {
+      #
+      idx1 <- idxs[1]
+      idx2 <- which(column_agl_icld == min(column_agl_icld[-idx1]))
+      #
+      if (length(idx2) > 1) {
+        #
+        idx2_expected <- idx1 + 2
+        if (idx2_expected > 4) { idx2_expected <- idx2_expected - 4 }
+        #
+        idx2 <- idx2[which(abs(idx2 - idx2_expected) == min(abs(idx2 - idx2_expected)))]
+      }
+    }
+    # 
+    # owing to numerical errors
+    # possibly, two subtense have the same included angle
+    else {
+      #
+      idx1 <- idxs[1]
+      idx2 <- idxs[2]
+    }
+    #
+    # get idx
+    if (column_dist[idx1] >= column_dist[idx2]) { idx <- idx1 }
+    else { idx <- idx2 }
+    #
+    # get agl and end_Anchor0
+    GrpBndAgl_end <- column_agl[idx]
+    end_Anchor0 <- data.frame(column_mp[idx, ])
+  }
+  #
+  # get split
+  list_split <- f_pnts_group_end_split(pnts_bnd, pnt0, end_Anchor0)
+  bnd_sides_right <- list_split[[1]]
+  bnd_sides_left <- list_split[[2]]
+  #
+  # return
+  return(list(bnd_sides_right, bnd_sides_left, GrpBndAgl_end))
+}
+#
+#
+#
+f_pnts_bnd_end_quad <- function(pnts_bnd, pnts0) {
+  #
+  # get sorted
+  pnts_bnd <- f_pnts_bnd_ascending(pnts_bnd)
+  #
+  # get pnt0
+  pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
+  colnames(pnt0) <- c("Cx", "Cy")
+  #
+  # check
+  if (nrow(pnts_bnd) == 3) {
+    #
+    # get angle
+    agl <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # check
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    # #
+    # # get Agl0
+    # Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    # #
+    # # get angle, included
+    # agl_icld <- f_angle_included(Agl0, agl)
+    # #
+    # # check
+    # if (agl_icld > pi/2) { 
+    #   #
+    #   # reverse
+    #   agl <- agl - pi
+    # }
+    # #
+    # # check
+    # if (agl > pi) { agl <- agl - pi*2 }
+    # if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get agl and end_Anchor0
+    GrpBndAgl_end <- agl
+    end_Anchor0 <- data.frame(pnts_bnd[2, c("Cx", "Cy")])
+  }
+  else {
+    #
+    # convex hull, to reduce pnts
+    # and, also, to guarantee quadrilateral be convex
+    pnts_chull <- pnts_bnd[chull(pnts_bnd[, c("Cx", "Cy")]), ]
+    pnts_chull <- pnts_chull[, c("Cx", "Cy")]
+    #
+    # get count
+    count_pnt <- nrow(pnts_chull)
+    #
+    # get Agl0
+    Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # keep original
+    Agl0_original <- Agl0
+    #
+    # get perpendicular of Agl0
+    Agl0_perp <- Agl0 + pi/2
+    Agl0_perp_x <- cos(Agl0_perp)
+    Agl0_perp_y <- sin(Agl0_perp)
+    #
+    # initial
+    dots_sum <- 0
+    #
+    # get dots
+    for (i in 1:count_pnt) {
+      #
+      # append
+      dots_sum <- dots_sum + (pnts_chull[i, "Cx"] - pnt0[1]) * Agl0_perp_x + (pnts_chull[i, "Cy"] - pnt0[2]) * Agl0_perp_y
+    }
+    #
+    # check
+    if (dots_sum < 0 ) { Agl0 <- Agl0 + pi }
+    #
+    # check
+    if (Agl0 > pi) { Agl0 <- Agl0 - pi*2 }
+    #
+    # get initials
+    par_init <- c(Agl0+pi, 0.5, 0.5)
+    #
+    # get optim
+    if (F) {
+      #
+      # get bounds
+      bound_lower <- c(Agl0 + pi/2, 0.01, 0.01)
+      bound_upper <- c(Agl0 + pi/2 + pi, 0.99, 0.99)
+      #
+      # optim
+      res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
+                   lower = bound_lower, upper = bound_upper, method = "L-BFGS-B")
+      # # optim
+      # # using SANN is too inefficient
+      # # and, because no bounds, get wrong results?
+      # res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
+      #              method = "SANN")
+    }
+    else {
+      #
+      #
+      # using TEN intervals
+      # to avoid getting local minimum?
+      #
+      #
+      # get bounds
+      column_bounds <- Agl0 + pi/2 + pi*(0:10)/10
+      # get bounds, count
+      count_bounds <- length(column_bounds) - 1
+      # get bounds
+      column_bound_lower <- column_bounds[1:count_bounds]
+      column_bound_upper <- column_bounds[2:(count_bounds+1)]
+      #
+      # initial
+      list_res <- list()
+      column_value <- c()
+      # 
+      # get optim
+      for (i in 1:count_bounds) {
+        #
+        # get bounds
+        bound_lower <- c(column_bound_lower[i], 0.01, 0.01)
+        bound_upper <- c(column_bound_upper[i], 0.99, 0.99)
+        #
+        # optim
+        res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
+                     lower = bound_lower, upper = bound_upper, method = "L-BFGS-B")
+        #
+        # append
+        list_res[[(length(list_res)+1)]] <- res
+        column_value <- rbind(column_value, res$value)
+      }
+      #
+      # get optim
+      idx <- which(column_value == min(column_value))
+      res <- list_res[[idx[1]]]
+    }
+    #
+    # get optim
+    Aglx_optim <- res$par
+    #
+    # get Agls
+    Agl2 <- Aglx_optim[1]
+    # get Agls
+    Agl1_ratio <- Aglx_optim[2]
+    Agl3_ratio <- Aglx_optim[3]
+    # get Agls
+    Agl1_min <- max(Agl2-pi, Agl0)
+    Agl3_min <- max(Agl0+pi*2-pi, Agl2)
+    # get Agls
+    Agl1_max <- min(Agl0+pi, Agl2)
+    Agl3_max <- min(Agl2+pi, Agl0+pi*2)
+    # get Agls
+    Agl1 <- Agl1_min + (Agl1_max-Agl1_min) * Agl1_ratio
+    Agl3 <- Agl3_min + (Agl3_max-Agl3_min) * Agl3_ratio
+    #
+    # get agls
+    Agls <- c(Agl0, Agl1, Agl2, Agl3)
+    #
+    # get ints
+    list_ints <- f_pnts_bqc(pnts_chull, Agls, pnt0)
+    # get ints
+    int01 <- list_ints[[1]]
+    int12 <- list_ints[[2]]
+    int23 <- list_ints[[3]]
+    int30 <- list_ints[[4]]
+    #
+    # debugging
+    if (F) {
+      # #
+      # # save
+      # f_pnts_save_points(rbind(int01, int12, int23, int30), NA, "int")
+      #
+      # get
+      quadrilateral_edges <- rbind(int01, int12, int23, int30, int01)
+      colnames(quadrilateral_edges) <- c("Cx", "Cy")
+      #
+      # save
+      f_pnts_save_polylines(list(quadrilateral_edges), NA, "quadrilateral")
+    }
+    #
+    # get
+    GrpBndAgl_end <- Agl2
+    #
+    # check
+    agl_icld <- f_angle_included(Agl0_original, GrpBndAgl_end)
+    # reverse
+    if (agl_icld > pi/2) { GrpBndAgl_end <- GrpBndAgl_end - pi }
+    #
+    # check
+    if (GrpBndAgl_end > pi) { GrpBndAgl_end <- GrpBndAgl_end - pi*2 }
+    if (GrpBndAgl_end < -pi) { GrpBndAgl_end <- GrpBndAgl_end + pi*2 }
+    #
+    # get end anchor, only direction
+    end_Anchor0 <- data.frame((int12[1, "Cx"] + int23[1, "Cx"])/2, (int12[1, "Cy"] + int23[1, "Cy"])/2)
+    colnames(end_Anchor0) <- c("Cx", "Cy")
+  }
+  #
+  # get split
+  list_split <- f_pnts_group_end_split(pnts_bnd, pnt0, end_Anchor0)
+  bnd_sides_right <- list_split[[1]]
+  bnd_sides_left <- list_split[[2]]
+  #
+  # return
+  return(list(bnd_sides_right, bnd_sides_left, GrpBndAgl_end))
+}
+#
+#
+#
+f_pnts_bnd_end_even <- function(pnts, pnts0, BoolInitial = T) {
+  #
+  # get bnd pnts
+  pnts_bnd <- pnts[which(pnts[, "IDB"] != 0), ]
+  #
+  # check
+  if (nrow(pnts_bnd) == 3) {
+    #
+    # get sorted
+    pnts_bnd_ascending <- f_pnts_bnd_ascending(pnts_bnd)
+    #
+    # get pnts bnd sides
+    # both sides keep split pnt?
+    # for initial end group
+    bnd_sides_right <- pnts_bnd_ascending[2:3, ]
+    bnd_sides_left <- pnts_bnd_ascending[1:2, ]
+    # if distal end group, switch
+    if (BoolInitial == F) {
+      #
+      bnd_sides_right <- pnts_bnd_ascending[1:2, ]
+      bnd_sides_left <- pnts_bnd_ascending[2:3, ]
+    }
+  }
+  else {
+    #
+    # do not use circular statistics
+    # just loop all the bnd pnts, to see which bnd pnt or bnd pair splits most equally
+    #
+    # also, check if the most equally bnd pnt is blocked by other bnd pnt
+    # straight flow path that crosses the bnd is not accepted
+    #
+    # it might be slightly slower than using circular statistics
+    # but much more robust and concise
+    #
+    # situation is very complex
+    # so, check unblocked for all bnd pnts
+    # although might cost more time, but more robust and concise
+    #
+    # get pnt0
+    pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
+    colnames(pnt0) <- c("Cx", "Cy")
+    #
+    # initial, remove pnt0 from pnts, might be redundant
+    pnts_pnt0_rm <- c()
+    #
+    # initial
+    pnts_angles <- c()
+    #
+    # get angles
+    for (i in 1:nrow(pnts)) {
+      #
+      # get xy
+      lx <- as.numeric(pnts[i, "Cx"] - pnt0[1])
+      ly <- as.numeric(pnts[i, "Cy"] - pnt0[2])
+      #
+      # if not the same
+      if (lx != 0 || ly != 0) {
+        #
+        # append
+        pnts_pnt0_rm <- rbind(pnts_pnt0_rm, pnts[i, ])
+        #
+        # get angle
+        pnts_angles <- c(pnts_angles, atan2(ly, lx))
+      }
+    }
+    #
+    # get bnd pnts
+    pnts_pnt0_rm_bnd <- pnts_pnt0_rm[which(pnts_pnt0_rm[, "IDB"] != 0), ]
+    #
+    # get sorted
+    pnts_pnt0_rm_bnd_ascending <- f_pnts_bnd_ascending(pnts_pnt0_rm_bnd)
+    #
+    # get pnts_curve, for bnd pnts
+    pnts_curve_bnd <- pnts_pnt0_rm_bnd_ascending[, c("Cx", "Cy")]
+    #
+    # get count
+    count_pnt_bnd <- nrow(pnts_curve_bnd)
+    #
+    # initial
+    pnts_angles_bnd <- c()
+    #
+    # get angles, for bnd pnts
+    for (i in 1:count_pnt_bnd) {
+      #
+      # get xy
+      lx <- as.numeric(pnts_curve_bnd[i, "Cx"] - pnt0[1])
+      ly <- as.numeric(pnts_curve_bnd[i, "Cy"] - pnt0[2])
+      #
+      # if not the same, theoretically will not happen here
+      if (lx != 0 || ly != 0) {
+        #
+        # get angle
+        pnts_angles_bnd <- c(pnts_angles_bnd, atan2(ly, lx))
+      }
+    }
+    #
+    # initial
+    column_count_diff <- c()
+    #
+    # get difference
+    for (i in 1:count_pnt_bnd) {
+      #
+      # get angle for bnd pnt
+      pnts_angles_bnd_i <- pnts_angles_bnd[i]
+      #
+      # initial
+      pnts_angles_sign <- pnts_angles - pnts_angles_bnd_i
+      #
+      # update
+      pnts_angles_sign[pnts_angles_sign > pi] <- pnts_angles_sign[pnts_angles_sign > pi] - pi*2
+      pnts_angles_sign[pnts_angles_sign < -pi] <- pnts_angles_sign[pnts_angles_sign < -pi] + pi*2
+      #
+      # update
+      pnts_angles_sign[pnts_angles_sign == pi] <- 0
+      pnts_angles_sign[pnts_angles_sign == -pi] <- 0
+      #
+      # get count
+      count_right <- sum(pnts_angles_sign < 0)
+      count_left <- sum(pnts_angles_sign > 0)
+      #
+      # get count diff
+      column_count_diff <- c(column_count_diff, count_right - count_left)
+    }
+    #
+    # initial
+    column_unblocked <- c()
+    #
+    # check blocked or not
+    for (i in 1:count_pnt_bnd) {
+      #
+      # get bnd pnt
+      pnt_bnd <- pnts_curve_bnd[i, ]
+      #
+      # get intersects
+      ints <- f_pnts_bnd_end_even_ints(pnts_curve_bnd, pnt0, pnt_bnd)
+      #
+      # if, or not, blocked by another bnd pnt
+      if (nrow(ints) == 1) { column_unblocked <- c(column_unblocked, 1) }
+      else { column_unblocked <- c(column_unblocked, 0) }
+    }
+    #
+    # initial ID split
+    ID_split_Ahead <- NA
+    ID_split_Behind <- NA
+    #
+    # get minimum absolute difference
+    diff_abs_min <- min(abs(column_count_diff[column_unblocked == 1]))
+    diff_abs_min_ID <- which((abs(column_count_diff) == diff_abs_min) & (column_unblocked == 1))
+    #
+    # check
+    if (length(diff_abs_min_ID) == 0) {
       #
       # possibly
       # mostly because end group is too small
-      # for example, pnt0 is circled by pnts
-      # then, any segment can split equally
+      # for example, two bnd pnts, one internal pnts
       # mark stop marker for group as "SGE"
       #
       # return
       return(NA)
     }
     #
-    # get
-    ID_split_Ahead <- diff_abs_min_ID
-    ID_split_Behind <- diff_abs_min_ID
-  }
-  else {
-    #
-    # initial
-    column_count_diff_around_zero <- c()
-    #
-    # get
-    for (i in 1:(count_pnt_bnd-1)) { 
+    # check
+    if (column_count_diff[diff_abs_min_ID[1]] == 0) {
       #
-      # append
-      if ((column_unblocked[i] == 1) && (column_unblocked[i+1] == 1) && (column_count_diff[i]*column_count_diff[i+1] < 0)) { 
+      # check
+      if (length(diff_abs_min_ID) > 1) {
         #
-        # append
-        column_count_diff_around_zero <- c(column_count_diff_around_zero, 1) 
+        # possibly
+        # mostly because end group is too small
+        # for example, pnt0 is circled by pnts
+        # then, any segment can split equally
+        # mark stop marker for group as "SGE"
         #
-        # get
-        ID_split_Ahead <- i+1
-        ID_split_Behind <- i
+        # return
+        return(NA)
       }
-      else {
-        #
-        # append
-        column_count_diff_around_zero <- c(column_count_diff_around_zero, 0)
-      }
-    }
-    #
-    # debugging
-    if (sum(column_count_diff_around_zero == 1) > 1) {
-      #
-      # just use the last pnt pair with difference around zero
-      #
-      # #
-      # # get pnts_curve
-      # pnts_curve_segment <- rbind(as.numeric(pnt0))
-      # #
-      # # get
-      # colnames(pnts_curve_segment) <- c("Cx", "Cy")
-      # pnts_curve_segment <- data.frame(pnts_curve_segment)
-      # #
-      # # debugging
-      # f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
-      # f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
-      #
-      # message
-      # message("Error: more than one pnt pair with difference around zero.")
-      message("Warning: more than one pnt pair with difference around zero.")
-      # #
-      # # return
-      # return(NULL)
-    }
-    #
-    # do not have one pair around zero, use min
-    if (sum(column_count_diff_around_zero == 1) < 1) {
       #
       # get
       ID_split_Ahead <- diff_abs_min_ID
       ID_split_Behind <- diff_abs_min_ID
     }
-  }
-  #
-  # get pnts bnd sides
-  # both sides keep split pnt?
-  # for initial end group
-  bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
-  bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
-  # if distal end group, switch
-  if (BoolInitial == F) {
+    else {
+      #
+      # initial
+      column_count_diff_around_zero <- c()
+      #
+      # get
+      for (i in 1:(count_pnt_bnd-1)) { 
+        #
+        # append
+        if ((column_unblocked[i] == 1) && (column_unblocked[i+1] == 1) && (column_count_diff[i]*column_count_diff[i+1] < 0)) { 
+          #
+          # append
+          column_count_diff_around_zero <- c(column_count_diff_around_zero, 1) 
+          #
+          # get
+          ID_split_Ahead <- i+1
+          ID_split_Behind <- i
+        }
+        else {
+          #
+          # append
+          column_count_diff_around_zero <- c(column_count_diff_around_zero, 0)
+        }
+      }
+      #
+      # debugging
+      if (sum(column_count_diff_around_zero == 1) > 1) {
+        #
+        # just use the last pnt pair with difference around zero
+        #
+        # #
+        # # get pnts_curve
+        # pnts_curve_segment <- rbind(as.numeric(pnt0))
+        # #
+        # # get
+        # colnames(pnts_curve_segment) <- c("Cx", "Cy")
+        # pnts_curve_segment <- data.frame(pnts_curve_segment)
+        # #
+        # # debugging
+        # f_pnts_save_points(pnts_curve_bnd, NA, "pnts_curve_bnd")
+        # f_pnts_save_points(pnts_curve_segment, NA, "pnts_curve_segment")
+        #
+        # message
+        # message("Error: more than one pnt pair with difference around zero.")
+        message("Warning: more than one pnt pair with difference around zero.")
+        # #
+        # # return
+        # return(NULL)
+      }
+      #
+      # do not have one pair around zero, use min
+      if (sum(column_count_diff_around_zero == 1) < 1) {
+        #
+        # get
+        ID_split_Ahead <- diff_abs_min_ID
+        ID_split_Behind <- diff_abs_min_ID
+      }
+    }
     #
-    bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
-    bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
+    # get pnts bnd sides
+    # both sides keep split pnt?
+    # for initial end group
+    bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
+    bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
+    # if distal end group, switch
+    if (BoolInitial == F) {
+      #
+      bnd_sides_right <- pnts_pnt0_rm_bnd_ascending[1:ID_split_Behind, ]
+      bnd_sides_left <- pnts_pnt0_rm_bnd_ascending[ID_split_Ahead:nrow(pnts_pnt0_rm_bnd_ascending), ]
+    }
   }
   #
   # return
@@ -2569,320 +3205,6 @@ f_pnts_bnd_end_even_ints <- function(pnts_curve_bnd, pnt0, pnt_bnd) {
   #
   # return
   return(ints)
-}
-#
-#
-#
-f_pnts_bnd_end_mbb <- function(pnts_bnd, pnts0) {
-  #
-  # convex hull, to reduce pnts
-  pnts_chull <- pnts_bnd[chull(pnts_bnd[, c("Cx", "Cy")]), ]
-  pnts_chull <- pnts_chull[, c("Cx", "Cy")]
-  #
-  # get mbb
-  colnames(pnts_chull) <- c("x", "y")
-  mbb <- shotGroups::getMinBBox(pnts_chull)
-  #
-  # get edges
-  mbb_edges <- mbb$pts
-  mbb_edges <- rbind(mbb_edges, mbb_edges[1, ])
-  colnames(mbb_edges) <- c("Cx", "Cy")
-  #
-  # debugging
-  if (F) {
-    #
-    # save
-    f_pnts_save_polylines(list(mbb_edges), NA, "mbb")
-  }
-  #
-  # get Agl0
-  Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
-  #
-  # initial
-  column_agl <- c()
-  column_agl_icld <- c()
-  # 
-  # get, angle of edge
-  for (i in 1:4) {
-    #
-    # get angle
-    agl <- atan2(mbb_edges[i+1, "Cy"]-mbb_edges[i, "Cy"], mbb_edges[i+1, "Cx"]-mbb_edges[i, "Cx"])
-    #
-    # get angle, included
-    agl_icld <- f_angle_included(Agl0, agl)
-    #
-    # check
-    if (agl_icld > pi/2) { 
-      #
-      # reverse
-      agl <- agl - pi
-      agl_icld <- pi - agl_icld
-    }
-    #
-    # check
-    if (agl > pi) { agl <- agl - pi*2 }
-    if (agl < -pi) { agl <- agl + pi*2 }
-    #
-    # append
-    column_agl <- rbind(column_agl, agl)
-    column_agl_icld <- rbind(column_agl_icld, agl_icld)
-  }
-  #
-  # initial, middle pnts
-  column_mp <- c()
-  # 
-  # get, middle pnts
-  for (i in 1:4) {
-    #
-    # get coords
-    x <- (mbb_edges[i, "Cx"] + mbb_edges[i+1, "Cx"])/2
-    y <- (mbb_edges[i, "Cy"] + mbb_edges[i+1, "Cy"])/2
-    #
-    # append
-    column_mp <- rbind(column_mp, c(x, y))
-  }
-  #
-  # colnames
-  colnames(column_mp) <- c("Cx", "Cy")
-  column_mp <- data.frame(column_mp)
-  #
-  # get pnt0
-  pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
-  colnames(pnt0) <- c("Cx", "Cy")
-  #
-  # get coords
-  x0 <- pnt0[1, "Cx"]
-  y0 <- pnt0[1, "Cy"]
-  #
-  # initial, distance
-  column_dist <- c()
-  # 
-  # get, distance
-  for (i in 1:4) {
-    #
-    # get coords
-    x <- column_mp[i, "Cx"]
-    y <- column_mp[i, "Cy"]
-    #
-    # get dist
-    dist <- sqrt((x - x0)^2 + (y - y0)^2)
-    #
-    # append
-    column_dist <- rbind(column_dist, dist)
-  }
-  #
-  # get idx
-  idxs <- which(column_agl_icld == min(column_agl_icld))
-  #
-  # owing to numerical errors
-  # possibly, two subtense have different included angles
-  if (length(idxs) == 1) {
-    #
-    idx1 <- idxs[1]
-    idx2 <- which(column_agl_icld == min(column_agl_icld[-idx1]))
-    #
-    if (length(idx2) > 1) {
-      #
-      idx2_expected <- idx1 + 2
-      if (idx2_expected > 4) { idx2_expected <- idx2_expected - 4 }
-      #
-      idx2 <- idx2[which(abs(idx2 - idx2_expected) == min(abs(idx2 - idx2_expected)))]
-    }
-  }
-  # 
-  # owing to numerical errors
-  # possibly, two subtense have the same included angle
-  else {
-    #
-    idx1 <- idxs[1]
-    idx2 <- idxs[2]
-  }
-  #
-  # get idx
-  if (column_dist[idx1] >= column_dist[idx2]) { idx <- idx1 }
-  else { idx <- idx2 }
-  #
-  # get agl and end_Anchor0
-  GrpBndAgl_end <- column_agl[idx]
-  end_Anchor0 <- data.frame(column_mp[idx, ])
-  #
-  # get split
-  list_split <- f_pnts_group_end_split(pnts_bnd, pnt0, end_Anchor0)
-  bnd_sides_right <- list_split[[1]]
-  bnd_sides_left <- list_split[[2]]
-  #
-  # return
-  return(list(bnd_sides_right, bnd_sides_left, GrpBndAgl_end))
-}
-#
-#
-#
-f_pnts_bnd_end_quad <- function(pnts_bnd, pnts0) {
-  #
-  # convex hull, to reduce pnts
-  # and, also, to guarantee quadrilateral be convex
-  pnts_chull <- pnts_bnd[chull(pnts_bnd[, c("Cx", "Cy")]), ]
-  pnts_chull <- pnts_chull[, c("Cx", "Cy")]
-  #
-  # get count
-  count_pnt <- nrow(pnts_chull)
-  #
-  # get pnt0
-  pnt0 <- data.frame((pnts0[1, "Cx"] + pnts0[2, "Cx"])/2, (pnts0[1, "Cy"] + pnts0[2, "Cy"])/2)
-  colnames(pnt0) <- c("Cx", "Cy")
-  #
-  # get Agl0
-  Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
-  #
-  # keep original
-  Agl0_original <- Agl0
-  #
-  # get perpendicular of Agl0
-  Agl0_perp <- Agl0 + pi/2
-  Agl0_perp_x <- cos(Agl0_perp)
-  Agl0_perp_y <- sin(Agl0_perp)
-  #
-  # initial
-  dots_sum <- 0
-  #
-  # get dots
-  for (i in 1:count_pnt) {
-    #
-    # append
-    dots_sum <- dots_sum + (pnts_chull[i, "Cx"] - pnt0[1]) * Agl0_perp_x + (pnts_chull[i, "Cy"] - pnt0[2]) * Agl0_perp_y
-  }
-  #
-  # check
-  if (dots_sum < 0 ) { Agl0 <- Agl0 + pi }
-  #
-  # check
-  if (Agl0 > pi) { Agl0 <- Agl0 - pi*2 }
-  #
-  # get initials
-  par_init <- c(Agl0+pi, 0.5, 0.5)
-  #
-  # get optim
-  if (F) {
-    #
-    # get bounds
-    bound_lower <- c(Agl0 + pi/2, 0.01, 0.01)
-    bound_upper <- c(Agl0 + pi/2 + pi, 0.99, 0.99)
-    #
-    # optim
-    res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
-                 lower = bound_lower, upper = bound_upper, method = "L-BFGS-B")
-    # # optim
-    # # using SANN is too inefficient
-    # # and, because no bounds, get wrong results?
-    # res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
-    #              method = "SANN")
-  }
-  else {
-    #
-    #
-    # using TEN intervals
-    # to avoid getting local minimum?
-    #
-    #
-    # get bounds
-    column_bounds <- Agl0 + pi/2 + pi*(0:10)/10
-    # get bounds, count
-    count_bounds <- length(column_bounds) - 1
-    # get bounds
-    column_bound_lower <- column_bounds[1:count_bounds]
-    column_bound_upper <- column_bounds[2:(count_bounds+1)]
-    #
-    # initial
-    list_res <- list()
-    column_value <- c()
-    # 
-    # get optim
-    for (i in 1:count_bounds) {
-      #
-      # get bounds
-      bound_lower <- c(column_bound_lower[i], 0.01, 0.01)
-      bound_upper <- c(column_bound_upper[i], 0.99, 0.99)
-      #
-      # optim
-      res <- optim(par = par_init, f_pnts_bqa, pnts = pnts_chull, Agl0 = Agl0, pnt0 = pnt0,
-                   lower = bound_lower, upper = bound_upper, method = "L-BFGS-B")
-      #
-      # append
-      list_res[[(length(list_res)+1)]] <- res
-      column_value <- rbind(column_value, res$value)
-    }
-    #
-    # get optim
-    idx <- which(column_value == min(column_value))
-    res <- list_res[[idx[1]]]
-  }
-  #
-  # get optim
-  Aglx_optim <- res$par
-  #
-  # get Agls
-  Agl2 <- Aglx_optim[1]
-  # get Agls
-  Agl1_ratio <- Aglx_optim[2]
-  Agl3_ratio <- Aglx_optim[3]
-  # get Agls
-  Agl1_min <- max(Agl2-pi, Agl0)
-  Agl3_min <- max(Agl0+pi*2-pi, Agl2)
-  # get Agls
-  Agl1_max <- min(Agl0+pi, Agl2)
-  Agl3_max <- min(Agl2+pi, Agl0+pi*2)
-  # get Agls
-  Agl1 <- Agl1_min + (Agl1_max-Agl1_min) * Agl1_ratio
-  Agl3 <- Agl3_min + (Agl3_max-Agl3_min) * Agl3_ratio
-  #
-  # get agls
-  Agls <- c(Agl0, Agl1, Agl2, Agl3)
-  #
-  # get ints
-  list_ints <- f_pnts_bqc(pnts_chull, Agls, pnt0)
-  # get ints
-  int01 <- list_ints[[1]]
-  int12 <- list_ints[[2]]
-  int23 <- list_ints[[3]]
-  int30 <- list_ints[[4]]
-  #
-  # debugging
-  if (F) {
-    # #
-    # # save
-    # f_pnts_save_points(rbind(int01, int12, int23, int30), NA, "int")
-    #
-    # get
-    quadrilateral_edges <- rbind(int01, int12, int23, int30, int01)
-    colnames(quadrilateral_edges) <- c("Cx", "Cy")
-    #
-    # save
-    f_pnts_save_polylines(list(quadrilateral_edges), NA, "quadrilateral")
-  }
-  #
-  # get
-  GrpBndAgl_end <- Agl2
-  #
-  # check
-  agl_icld <- f_angle_included(Agl0_original, GrpBndAgl_end)
-  # reverse
-  if (agl_icld > pi/2) { GrpBndAgl_end <- GrpBndAgl_end - pi }
-  #
-  # check
-  if (GrpBndAgl_end > pi) { GrpBndAgl_end <- GrpBndAgl_end - pi*2 }
-  if (GrpBndAgl_end < -pi) { GrpBndAgl_end <- GrpBndAgl_end + pi*2 }
-  #
-  # get end anchor, only direction
-  end_Anchor0 <- data.frame((int12[1, "Cx"] + int23[1, "Cx"])/2, (int12[1, "Cy"] + int23[1, "Cy"])/2)
-  colnames(end_Anchor0) <- c("Cx", "Cy")
-  #
-  # get split
-  list_split <- f_pnts_group_end_split(pnts_bnd, pnt0, end_Anchor0)
-  bnd_sides_right <- list_split[[1]]
-  bnd_sides_left <- list_split[[2]]
-  #
-  # return
-  return(list(bnd_sides_right, bnd_sides_left, GrpBndAgl_end))
 }
 #
 #
@@ -3212,6 +3534,12 @@ f_pnts_group_end_split <- function(pnts_bnd, pnt0, end_Anchor0) {
   # not necessarily real left and right, just for a mark here
   pnts_bnd_sides_right <- pnts_bnd_ascending_pnt0_rm[1:idx, ]
   pnts_bnd_sides_left <- pnts_bnd_ascending_pnt0_rm[idx:nrow(pnts_bnd_ascending_pnt0_rm), ]
+  #
+  # debugging
+  if (nrow(pnts_bnd_sides_right) == 1 || nrow(pnts_bnd_sides_left) == 1 ) {
+    #
+    debugging <- 0
+  }
   # #
   # # get end anchor
   # end_Anchor <- pnts_bnd_ascending_pnt0_rm[idx]
@@ -3222,7 +3550,7 @@ f_pnts_group_end_split <- function(pnts_bnd, pnt0, end_Anchor0) {
 #
 #
 #
-f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndAlgorithmDistal, BoolDirection) {
+f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, BoolDirection) {
   #
   # get count
   count_pnts <- length(list_pnts)
@@ -3375,9 +3703,15 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
       #
       # set
       if (BoolInitial)
-      { EndAlgorithm <- EndAlgorithmInitial }
+      { EndAnchors <- EndAnchorsInt }
       else
-      { EndAlgorithm <- EndAlgorithmDistal }
+      { EndAnchors <- EndAnchorsDit }
+      #
+      # set
+      if (BoolInitial)
+      { EndStrips <- EndStripsInt }
+      else
+      { EndStrips <- EndStripsDit }
       #
       # get sorted
       pnts_i_bnd_ascending <- f_pnts_bnd_ascending(pnts_i_bnd)
@@ -3394,95 +3728,262 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
         pnts0 <- rbind(pnts_i_bnd_ascending[nrow(pnts_i_bnd_ascending), c("Cx", "Cy")], pnts_i_bnd_ascending[1, c("Cx", "Cy")])
       }
       #
-      # Algorithm 1
-      if (EndAlgorithm == 1) {
+      # Algorithm 
+      if (length(EndAnchors) == 1) {
         #
-        # quad
-        list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (BoolDirection) {
-          # #
-          # # quad
-          # list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
-          #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
-        }
-      }
-      #
-      # Algorithm 2
-      if (EndAlgorithm == 2) {
-        #
-        # mbb
-        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (BoolDirection) {
-          #
-          # quad
-          list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
-          #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
-        }
-      }
-      #
-      # Algorithm 3
-      if (EndAlgorithm == 3) {
-        #
-        # even
-        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0, BoolInitial)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (BoolDirection) {
-          #
-          # quad
-          list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
-          #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
-        }
-      }
-      #
-      # Algorithm 4
-      if (EndAlgorithm == 4) {
-        #
-        # quad
-        list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (BoolDirection) {
+        # Algorithm -1
+        if (EndAnchors == -1) {
           #
           # mbb
           list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
           #
           # get, for end group
-          GrpBndAgl <- list_end[[3]]
+          bnd_sides_right <- list_end[[1]]
+          bnd_sides_left <- list_end[[2]]
+          #
+          # check
+          if (BoolDirection) {
+            #
+            # check
+            if (EndStrips == -1) {
+              # #
+              # # mbb
+              # list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -2) {
+              #
+              # quad
+              list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -3) {
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get agl
+              agl <- Agl0
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+            #
+            # check
+            if (EndStrips >= 0) {
+              #
+              # initial
+              agl <- EndStrips
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get angle, included
+              agl_icld <- f_angle_included(Agl0, agl)
+              #
+              # check
+              if (agl_icld > pi/2) { 
+                #
+                # reverse
+                agl <- agl - pi
+              }
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+          }
+        }
+        #
+        # Algorithm -2
+        if (EndAnchors == -2) {
+          #
+          # quad
+          list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+          #
+          # get, for end group
+          bnd_sides_right <- list_end[[1]]
+          bnd_sides_left <- list_end[[2]]
+          #
+          # check
+          if (BoolDirection) {
+            #
+            # check
+            if (EndStrips == -1) {
+              #
+              # mbb
+              list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -2) {
+              # #
+              # # quad
+              # list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -3) {
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get agl
+              agl <- Agl0
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+            #
+            # check
+            if (EndStrips >= 0) {
+              #
+              # initial
+              agl <- EndStrips
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get angle, included
+              agl_icld <- f_angle_included(Agl0, agl)
+              #
+              # check
+              if (agl_icld > pi/2) { 
+                #
+                # reverse
+                agl <- agl - pi
+              }
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+          }
+        }
+        #
+        # Algorithm -3
+        if (EndAnchors == -3) {
+          #
+          # even
+          list_end <- f_pnts_bnd_end_even(pnts_i, pnts0, BoolInitial)
+          #
+          # get, for end group
+          bnd_sides_right <- list_end[[1]]
+          bnd_sides_left <- list_end[[2]]
+          #
+          # check
+          if (BoolDirection) {
+            #
+            # check
+            if (EndStrips == -1) {
+              #
+              # mbb
+              list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -2) {
+              #
+              # quad
+              list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+              #
+              # get, for end group
+              GrpBndAgl <- list_end[[3]]
+            }
+            #
+            # check
+            if (EndStrips == -3) {
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get agl
+              agl <- Agl0
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+            #
+            # check
+            if (EndStrips >= 0) {
+              #
+              # initial
+              agl <- EndStrips
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get Agl0
+              Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+              #
+              # get angle, included
+              agl_icld <- f_angle_included(Agl0, agl)
+              #
+              # check
+              if (agl_icld > pi/2) { 
+                #
+                # reverse
+                agl <- agl - pi
+              }
+              #
+              # check
+              if (agl > pi) { agl <- agl - pi*2 }
+              if (agl < -pi) { agl <- agl + pi*2 }
+              #
+              # get, for end group
+              GrpBndAgl <- agl
+            }
+          }
         }
       }
-      #
-      # Algorithm 5
-      if (EndAlgorithm == 5) {
+      else {
         #
-        # mbb
-        list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+        # coords
+        list_end <- f_pnts_bnd_end_coords(pnts_i_bnd, pnts0, EndAnchors)
         #
         # get, for end group
         bnd_sides_right <- list_end[[1]]
@@ -3490,33 +3991,74 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
         #
         # check
         if (BoolDirection) {
-          # #
-          # # mbb
-          # list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
           #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
-        }
-      }
-      #
-      # Algorithm 6
-      if (EndAlgorithm == 6) {
-        #
-        # even
-        list_end <- f_pnts_bnd_end_even(pnts_i, pnts0, BoolInitial)
-        #
-        # get, for end group
-        bnd_sides_right <- list_end[[1]]
-        bnd_sides_left <- list_end[[2]]
-        #
-        # check
-        if (BoolDirection) {
+          # check
+          if (EndStrips == -1) {
+            #
+            # mbb
+            list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+            #
+            # get, for end group
+            GrpBndAgl <- list_end[[3]]
+          }
           #
-          # mbb
-          list_end <- f_pnts_bnd_end_mbb(pnts_i_bnd, pnts0)
+          # check
+          if (EndStrips == -2) {
+            #
+            # quad
+            list_end <- f_pnts_bnd_end_quad(pnts_i_bnd, pnts0)
+            #
+            # get, for end group
+            GrpBndAgl <- list_end[[3]]
+          }
           #
-          # get, for end group
-          GrpBndAgl <- list_end[[3]]
+          # check
+          if (EndStrips == -3) {
+            #
+            # get Agl0
+            Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+            #
+            # get agl
+            agl <- Agl0
+            #
+            # check
+            if (agl > pi) { agl <- agl - pi*2 }
+            if (agl < -pi) { agl <- agl + pi*2 }
+            #
+            # get, for end group
+            GrpBndAgl <- agl
+          }
+          #
+          # check
+          if (EndStrips >= 0) {
+            #
+            # initial
+            agl <- EndStrips
+            #
+            # check
+            if (agl > pi) { agl <- agl - pi*2 }
+            if (agl < -pi) { agl <- agl + pi*2 }
+            #
+            # get Agl0
+            Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+            #
+            # get angle, included
+            agl_icld <- f_angle_included(Agl0, agl)
+            #
+            # check
+            if (agl_icld > pi/2) { 
+              #
+              # reverse
+              agl <- agl - pi
+            }
+            #
+            # check
+            if (agl > pi) { agl <- agl - pi*2 }
+            if (agl < -pi) { agl <- agl + pi*2 }
+            #
+            # get, for end group
+            GrpBndAgl <- agl
+          }
         }
       }
       #
@@ -3590,11 +4132,10 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
       if ((pnts_i_bnd_sides_corners_check[2] == F)) {
         #
         # message
-        message("Error: invalid corners.")
+        message("Warning: invalid corners for end group initial.")
         #
         # return
-        # return(NULL)
-        return(1)
+        return(NULL)
       }
     }
     else if (i == count_pnts) {
@@ -3603,11 +4144,10 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
       if ((pnts_i_bnd_sides_corners_check[1] == F)) {
         #
         # message
-        message("Error: invalid corners.")
+        message("Warning: invalid corners for end group distal.")
         #
         # return
-        # return(NULL)
-        return(2)
+        return(NULL)
       }
     }
     else {
@@ -3617,7 +4157,7 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
           (pnts_i_bnd_sides_corners_check[2] == F)) {
         #
         # message
-        message("Error: invalid corners.")
+        message("Error: invalid corners for sub- groups.")
         #
         # return
         return(NULL)
@@ -3718,23 +4258,22 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAlgorithmInitial, EndA
   # update anchors
   column_anchors <- rbind(column_anchors, anchor_end_distal)
   #
-  # update initial and distal anchors
+  # UPDATE initial and distal anchors
   # let them connect to polygon boundary
   #
-  # set a switch
-  if (T) {
-    #
-    # update
-    anchor_xy_initial <- f_pnts_path_extending(column_anchors[c(2, 1), c("Cx", "Cy")], pPolygons)
-    column_anchors[1, c("Cx", "Cy", "Cz")] <- c(anchor_xy_initial, f_pnts_zip(list_pnts[[1]], anchor_xy_initial[1], anchor_xy_initial[2]))
-    #
-    # get count
-    count_anchor <- nrow(column_anchors)
-    #
-    # update
-    anchor_xy_distal <- f_pnts_path_extending(column_anchors[c(count_anchor-1, count_anchor), c("Cx", "Cy")], pPolygons)
-    column_anchors[count_anchor, c("Cx", "Cy", "Cz")] <- c(anchor_xy_distal, f_pnts_zip(list_pnts[[count_pnts]], anchor_xy_distal[1], anchor_xy_distal[2]))
-  }
+  # get count
+  count_anchor <- nrow(column_anchors)
+  #
+  # set a switch, initial
+  if (length(EndAnchorsInt) == 1) { anchor_xy_initial <- f_pnts_path_extending(column_anchors[c(2, 1), c("Cx", "Cy")], pPolygons) }
+  else { anchor_xy_initial <- EndAnchorsInt }
+  # set a switch, distal
+  if (length(EndAnchorsDit) == 1) { anchor_xy_distal <- f_pnts_path_extending(column_anchors[c(count_anchor-1, count_anchor), c("Cx", "Cy")], pPolygons) }
+  else { anchor_xy_distal <- EndAnchorsDit }
+  #
+  # update
+  column_anchors[1, c("Cx", "Cy", "Cz")] <- c(anchor_xy_initial, f_pnts_zip(list_pnts[[1]], anchor_xy_initial[1], anchor_xy_initial[2]))
+  column_anchors[count_anchor, c("Cx", "Cy", "Cz")] <- c(anchor_xy_distal, f_pnts_zip(list_pnts[[count_pnts]], anchor_xy_distal[1], anchor_xy_distal[2]))
   # #
   # # for debugging
   # file_out <- paste("column_anchors.xlsx", sep = "", collapse = NULL)
@@ -6693,16 +7232,95 @@ f_pnts_save_polylines <- function(list_pnts, CRS_out, file_out) {
 #
 #
 #
-f_pnts_save_proflle <- function(pnts_prfl, paras_strip, paras_input, CRS_out, file_out, LineID = 1) {
+f_pnts_save_proflle <- function(pnts_prfl, paras_strip, iName, MinGrpPntCnt, MinGrpAcrDst, MinStpHrzLen, MinEndRtoInt, MinEndRtoDit, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, CRS_out, file_out, LineID = 0) {
   #
   # get parameters for landslide profile
   paras <- f_pnts2paras_profile(pnts_prfl, paras_strip)
+  # #
+  # # check
+  # if (length(EndAnchorsInt) == 1 && EndAnchorsInt < 0) { EndAnchorsInt <- sprintf("%02d", abs(EndAnchorsInt)) }
+  # if (length(EndAnchorsDit) == 1 && EndAnchorsDit < 0) { EndAnchorsDit <- sprintf("%02d", abs(EndAnchorsDit)) }
+  # #
+  # # check
+  # if (EndStripsInt < 0) { EndStripsInt <- sprintf("%02d", abs(EndStripsInt)) }
+  # else { EndStripsInt <- EndStripsInt * 180 / pi }
+  # if (EndStripsDit < 0) { EndStripsDit <- sprintf("%02d", abs(EndStripsDit)) }
+  # else { EndStripsDit <- EndStripsDit * 180 / pi }
+  #
+  # DO NOT output characters
+  # I think, even if extereme coincidence happen 
+  # you can distinguish 1 (algorithm code) and 1.0 (coords and radian)
+  # at least, 1.0 will be 1.000000 by sprintf("%f", 1)
+  #
+  # check
+  if (length(EndAnchorsInt) == 1 && EndAnchorsInt < 0) { EndAnchorsInt <- abs(EndAnchorsInt) }
+  if (length(EndAnchorsDit) == 1 && EndAnchorsDit < 0) { EndAnchorsDit <- abs(EndAnchorsDit) }
+  #
+  # check
+  if (EndStripsInt < 0) { EndStripsInt <- abs(EndStripsInt) }
+  else { EndStripsInt <- EndStripsInt * 180 / pi }
+  if (EndStripsDit < 0) { EndStripsDit <- abs(EndStripsDit) }
+  else { EndStripsDit <- EndStripsDit * 180 / pi }
   #
   # get data.frame
-  paras_input <- data.frame(iMGPC = paras_input[1], iMGAD = paras_input[2], iMERI = paras_input[3], iMERD = paras_input[4], iEACI = paras_input[5], iEACD = paras_input[6], iMSHL = paras_input[7])
+  if (length(EndAnchorsInt) == 2 && length(EndAnchorsDit) == 2) {
+    #
+    paras_input <- data.frame(iMGPC = MinGrpPntCnt, 
+                              iMGAD = MinGrpAcrDst, 
+                              iMSHL = MinStpHrzLen, 
+                              iMERI = MinEndRtoInt, 
+                              iMERD = MinEndRtoDit, 
+                              iEAIx = EndAnchorsInt[1], 
+                              iEAIy = EndAnchorsInt[2],
+                              iEADx = EndAnchorsDit[1], 
+                              iEADy = EndAnchorsDit[2], 
+                              iESI = EndStripsInt, 
+                              iESD = EndStripsDit)
+  }
+  # get data.frame
+  if (length(EndAnchorsInt) == 2 && length(EndAnchorsDit) == 1) {
+    #
+    paras_input <- data.frame(iMGPC = MinGrpPntCnt, 
+                              iMGAD = MinGrpAcrDst, 
+                              iMSHL = MinStpHrzLen, 
+                              iMERI = MinEndRtoInt, 
+                              iMERD = MinEndRtoDit, 
+                              iEAIx = EndAnchorsInt[1], 
+                              iEAIy = EndAnchorsInt[2],
+                              iEAD = EndAnchorsDit, 
+                              iESI = EndStripsInt, 
+                              iESD = EndStripsDit)
+  }
+  # get data.frame
+  if (length(EndAnchorsInt) == 1 && length(EndAnchorsDit) == 2) {
+    #
+    paras_input <- data.frame(iMGPC = MinGrpPntCnt, 
+                              iMGAD = MinGrpAcrDst, 
+                              iMSHL = MinStpHrzLen, 
+                              iMERI = MinEndRtoInt, 
+                              iMERD = MinEndRtoDit, 
+                              iEAI = EndAnchorsInt,
+                              iEADx = EndAnchorsDit[1], 
+                              iEADy = EndAnchorsDit[2], 
+                              iESI = EndStripsInt, 
+                              iESD = EndStripsDit)
+  }
+  # get data.frame
+  if (length(EndAnchorsInt) == 1 && length(EndAnchorsDit) == 1) {
+    #
+    paras_input <- data.frame(iMGPC = MinGrpPntCnt, 
+                              iMGAD = MinGrpAcrDst, 
+                              iMSHL = MinStpHrzLen, 
+                              iMERI = MinEndRtoInt, 
+                              iMERD = MinEndRtoDit, 
+                              iEAI = EndAnchorsInt, 
+                              iEAD = EndAnchorsDit, 
+                              iESI = EndStripsInt, 
+                              iESD = EndStripsDit)
+  }
   #
   # get data_df, inputs leed paras
-  data_df <- cbind(paras_input, data.frame(ID = LineID), paras)
+  data_df <- cbind(data.frame(ID = LineID), data.frame(Name = iName), paras_input, paras)
   #
   # get spldf
   spldf <- f_pnts2shp_polyline(pnts_prfl, CRS_out, data_df)

@@ -4,11 +4,11 @@
 #                                                                        #
 #                                ALPA                                    #
 #                                                                        #
-#      An R-Script for for automatic analysis of landslide profile       #
+#       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 3.1                                #
+#                             Version 4.0                                #
 #                                                                        #
-#                           July 20th, 2023                              #
+#                          November 4th, 2023                            #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -25,23 +25,30 @@
 #
 # 1. Please make sure that,
 #    you have installed the latest and compatible versions of R and RStudio.
+#
 # 2. Please download and install Rtools,
 #    following official instructions of Rtools.
+#
 # 3. Important: compatibility of version.
 #    This version of ALPA works well on the Windows PC of the authors,
 #    with R-4.2.2, Rstudio 2022.07.2+576, Rtools42.
 #    And, all packages were updated to the latest version on NOV. 21th, 2022.
+#
 # 4. Please execute the script below,
 #    to install all required packages.
 #    And, be aware that the installation will take quite a while.
+#
 # 5. Please try a manual installation,
 #    if you have difficulties in the installation of any package.
+#
 # 6. If error messages tell that some packages are missing or can't find,
 #    try to manually install those packages.
+#
 # 7. Please add the paths of proj of "rgdal" and "sf" libraries,
 #    to the system environment variable "PROJ_LIB",
 #    for avoiding the possible warning message "Cannot find proj.db".
 #    The paths depend on where you install the "rgdal" and "sf" packages.
+#
 # 8. Restart RStudio.
 #
 # The script for installing all required packages
@@ -62,115 +69,221 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 #
 # === INSTRUCTIONS ===
 #
-# 1. Before applying the main function:
-#    Please execute the script below,
-#    to set working directory and source the main R script.
-#
-# 2. Please make sure all data have the same coordinate system.
-#
-# 3. Please make sure the resolution of the input DEM is integer.
-#
-# 4. The main function ALPA has the following inputs:
-#    -> FileDEM:              input DEM file, tif raster file is recommended.
-#    -> FileLandslides:       input polygon of landslide, shapefile vector file.
-#    -> MinGrpPntCnt:         minimum group point count.
-#    -> MinGrpAcrDst:         minimum group anchor distance.
-#    -> MinEndRtoInt:         minimum ratio for end group, initial.
-#    -> MinEndRtoDit:         minimum ratio for end group, distal.
-#    -> EndAgrCfgInt:         algorithm configuration for handling end group (anchor and strip), initial.
-#    -> EndAgrCfgDit:         algorithm configuration for handling end group (anchor and strip), distal.
-#    -> MinStpHrzLen:         minimum strip horizontal length.
-#    -> FilePrefix:           prefix for output files.
+# 1. The main function ALPA has the following inputs:
+#    -> FileDEM:              input DEM, tif raster file is recommended.
+#    -> FileLandslides:       input landslide polygons, shapefile vector file.
+#    -> FileParameters:       input file for several parameters, xlsx file.
+#    -> CfgEndAnchorsInt:     input configuration for end anchors (coordinates), initial.
+#    -> CfgEndAnchorsDit:     input configuration for end anchors (coordinates), distal.
+#    -> CfgEndStripsInt:      input configuration for end strips (directions), initial.
+#    -> CfgEndStripsDit:      input configuration for end strips (directions), distal.
 #    -> OutputHrcl:           whether output hierarchical results/files, T or F (default).
 #
-# 5. The output points and profiles are two dimensional (2D).
+# 2. The parameters file (FileParameters) must indicate the following 6 inputs:
+#    -> FilePrefix:           prefix for output files, usually the name of landslide.
+#    -> MinGrpPntCnt:         minimum group point count.
+#    -> MinGrpAcrDst:         minimum group anchor distance.
+#    -> MinStpHrzLen:         minimum strip horizontal length.
+#    -> MinEndRtoInt:         minimum ratio for end group, initial.
+#    -> MinEndRtoDit:         minimum ratio for end group, distal.
+#    ** Assume there are n landslides to be treated, 
+#       then, the parameters file should be a xlsx table with (n+1) row and 6 column,
+#       and, the first row is for the headings of the 6 parameter inputs,
+#       and, the parameters in the ith row will applied to the ith landslide.
+#       Users can just set FileParameters as the filename, e.g., "FileParameters.xlsx".
+#    ** Please note: The parameters file is not obligatory.
+#       If no parameters file is specified, set FileParameters as 0, 
+#       and all landslides will apply the same default parameters as follows.
+#    -> FilePrefix:           "lsdxxxxxx"
+#    -> MinGrpPntCnt:         3
+#    -> MinGrpAcrDst:         0
+#    -> MinStpHrzLen:         30
+#    -> MinEndRtoInt:         0.0000
+#    -> MinEndRtoDit:         0.0000
+#    ** Please note: "lsdxxxxxx" indicates the order of a landslide in FileLandslides.
+#
+# 3. The configuration for end anchors, indicates 
+#    either the coordinates of end anchors, 
+#    or the algorithm used to obtain end anchors.
+#    ** The recommendation is using point shapefiles to indicate the coordinates of end anchors.
+#       A point shapefile for initial end groups, and another one for distal end groups.
+#       The point shapefile must contains n point features,
+#       each of them indicate the location (coordinates) of the end anchor of a landslide.
+#       Users can just set CfgEndAnchorsInt and CfgEndAnchorsDit as the filenames, 
+#       e.g., "FileEndAnchorsInt.shp" and "FileEndAnchorsDit.shp".
+#    ** If users do not want to define point shapefiles, 
+#       predefined algorithms can be used to obtain end anchors.
+#       The code 1, 2 and 3 indicate "mbb", "quad" and "even" algorithms, respectively,
+#       which stand for using "minimum bounding box", "quadrilateral" and "even division" 
+#       to split end groups, respectively.
+#       The "mbb" algorithm is the most fast one, but is also expected to be the most rough one.
+#       The "quad" algorithm is expected to be the most sophisticated one, but is also very time-consuming.
+#       The speed of the "even" algorithm is between those of "mbb" and "quad".
+#    ** Users can just set CfgEndAnchorsInt and CfgEndAnchorsDit as 1, 2 or 3, 
+#       to indicate the algorithms used for initial and distal end groups.
+#       In this way, all landslides will apply the same algorithm.
+#       The recommendation is to use "mbb" (1) as a start, which is also the default choice.
+#
+# 4. The configuration for end strips, indicates 
+#    either the directions of end strips, 
+#    or the algorithm used to obtain end strips.
+#    ** The recommendation is using polyline shapefiles to indicate the directions of end strips.
+#       A polyline shapefile for initial end groups, and another one for distal end groups.
+#       The polyline shapefile must contains n polyline features,
+#       each of them indicate the orientation (direction) of the end strip of a landslide.
+#       Users can just set CfgEndStripsInt and CfgEndStripsDit as the filenames, 
+#       e.g., "FileEndStripsInt.shp" and "FileEndStripsDit.shp".
+#    ** If users do not want to define polyline shapefiles, 
+#       predefined algorithms can be used to obtain end strips.
+#       The code 1, 2 and 3 indicate "mbb", "quad" and "prll" algorithms, respectively,
+#       which stand for using "minimum bounding box", "quadrilateral" and "parallel edge" 
+#       to determine the directions of end strips, respectively.
+#       The "prll" algorithm means the end strip direction is "parallel" to the direction of the end group edge,
+#       which is the most fast one, but is also expected to be the most rough one.
+#       The "quad" algorithm is expected to be the most sophisticated one, but is also very time-consuming.
+#       The speed of the "mbb" algorithm is between those of "prll" and "quad".
+#    ** Users can just set CfgEndStripsInt and CfgEndStripsDit as 1, 2 or 3, 
+#       to indicate the algorithms used for initial and distal end groups.
+#       In this way, all landslides will apply the same algorithm.
+#       The recommendation is to use "mbb" (1) as a start, which is also the default choice.
+#
+# 5. It is recommended not to output hierarchical results/files, 
+#    i.e. to set OutputHrcl as "F" (also the default choice),
+#    especially when processing an inventory consisting of many landslides.
+#    If OutputHrcl is "T", only hierarchical sub- groups and anchors will be output.
+#
+# 6. The output points and profiles are two dimensional (2D).
 #    3D (z-aware) points and profiles can be produced based on the output excel files,
 #    using software like ArcGIS.
+#
+# 7. Please make sure all input GIS data (DEM file and shapefiles), 
+#    have the same coordinate system.
+#
+# 8. Please make sure the resolution of the input DEM, 
+#    is integer.
+#
+# 9. Before applying the main function,
+#    please execute the script below,
+#    to set working directory and source the main R script.
 # 
-# The script for setting working directory
+# The script for setting working directory.
 # The following directory is just an example.
 # Please change it to the working directory on your computer.
 # Please put all the R scripts (ALPA_*.R) and data files in the working directory.
 setwd("D:\\ALPA")
 #
-# The script for sourcing the main R script
+# The script for sourcing the main R script.
 rm(list = ls())
 source('ALPA_main.R')
 #
 #
 #
-# === EXAMPLES ===
+# === EXAMPLE ===
+#
+# DATA for the example are AVAILABLE in this repository.
+# Four landslides in the Central Asian area are used for illustrations.
 # 
-# Assume that the following inputs will be adopted:
-# -> FileDEM:               "dem.tif"
-# -> FileLandslides:        "lsd.shp"
-# -> MinGrpPntCnt:          3
-# -> MinGrpAcrDst:          0
-# -> MinEndRtoInt:          0.00
-# -> MinEndRtoDit:          0.00
-# -> EndAgrCfgInt:          1
-# -> EndAgrCfgDit:          1
-# -> MinStpHrzLen:          30
-# -> FilePrefix:            "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030"
-# 
-# Recommend not to output hierarchical results/files, 
-# especially when processing an inventory consisting of many landslides,
-# and to execute:
-ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030")
-# 
-# If you process an individual landslide,
-# and want to inspect the hierarchical sub- grouping steps,
-# you can try to output hierarchical results/files, and to execute:
-ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd0.00_ei01_ed01_s030", T)
-# Please NOTE: only hierarchical sub- groups and anchors will be output,
-# and, will be very time consuming, if set EndAgrCfg to be 1 or 4.
+# Assume that we have the following inputs of DEM and landslides:
+# -> FileDEM:              "In_DEM.tif"
+# -> FileLandslides:       "In00_Landslides.shp"
+# We can execute the following command, by applying pure default settings:
+ALPA("In_DEM.tif", "In00_Landslides.shp")
+# The above command is equivalent to the following ones:
+ALPA("In_DEM.tif", "In00_Landslides.shp", 0)
+ALPA("In_DEM.tif", "In00_Landslides.shp", 0, 1, 1, 1, 1)
+ALPA("In_DEM.tif", "In00_Landslides.shp", 0, 1, 1, 1, 1, F)
+# Please note: the above command is mostly an trail for new users.
+# Usually, it is not recommended to apply pure default settings.
+# In realistic applications, in the first trail, users are encouraged 
+# to directly apply files to define parameters and configurations for individual landslides. 
+#
+# If we are ready to apply different parameters and configurations for different landslides,
+# and, assume we have the following input files:
+# -> FileLandslides:       "In01_Landslides.shp"
+# -> FileParameters:       "In01_Parameters.xlsx".
+# -> CfgEndAnchorsInt:     "In01_EndAnchorsInt.shp".
+# -> CfgEndAnchorsDit:     "In01_EndAnchorsDit.shp".
+# -> CfgEndStripsInt:      "In01_EndStripsInt.shp".
+# -> CfgEndStripsDit:      "In01_EndStripsDit.shp".
+# We can execute the following command:
+ALPA("In_DEM.tif", "In01_Landslides.shp", "In01_Parameters.xlsx", "In01_EndAnchorsInt.shp", "In01_EndAnchorsDit.shp", "In01_EndStripsInt.shp", "In01_EndStripsDit.shp")
+# Please note: "In01_Landslides.shp" and "In00_Landslides.shp" are identical, 
+# and, in "In01_Parameters.xlsx", default parameters are actually used for all landslides,
+# except the FilePrefix, which is defined by the names of landslides.
+# The trick is to set appropriate EndAnchors and EndStrips configurations for individual landslides in this step, 
+# and, to adjust MinEndRto parameters for individual landslides (with unsatisfactory results), in the next step.
+#
+# We will check the results obtained by the above command, 
+# detect landslides with unsatisfactory results (anchors, path and strips), and make adjustments.
+# Usually, appropriate EndAnchors and EndStrips configurations have been already defined in the above step,
+# and, in this step, MinEndRto parameters will be adjusted for landslides with unsatisfactory results.
+# We found that, landslides "Kyrgyz_247R" and "Kyrgyz_248R" had obtained satisfying results in the above step,
+# so, in this step, we will adjust MinEndRto parameters for "Kyrgyz_314aR" and "Kyrgyz_314R".
+# After adjustments, assume we have the following input files:
+# -> FileLandslides:       "In02_Landslides.shp"
+# -> FileParameters:       "In02_Parameters.xlsx".
+# -> CfgEndAnchorsInt:     "In02_EndAnchorsInt.shp".
+# -> CfgEndAnchorsDit:     "In02_EndAnchorsDit.shp".
+# -> CfgEndStripsInt:      "In02_EndStripsInt.shp".
+# -> CfgEndStripsDit:      "In02_EndStripsDit.shp".
+# We can execute the following command:
+ALPA("In_DEM.tif", "In02_Landslides.shp", "In02_Parameters.xlsx", "In02_EndAnchorsInt.shp", "In02_EndAnchorsDit.shp", "In02_EndStripsInt.shp", "In02_EndStripsDit.shp")
+# Please note: in this example, the "In02_xxx" input files are only for "Kyrgyz_314aR" and "Kyrgyz_314R".
+# In this way, "Kyrgyz_247R" and "Kyrgyz_248R" with satisfying results will not be treated again, 
+# which can save time especially when the processing of some landslides costs much time.
+# If time is not a problem, users can also adjust MinEndRto parameters 
+# for landslides with unsatisfactory results, directly in "In01_Parameters.xlsx".
 #
 #
 #
-# === ExPERIENCES (ON PARAMETER SELECTION) ===
+# === EXPERIENCES (ON SETTINGS) ===
 # 
-# 01. Please be aware that there are no a set of universally appropriate parameters,
+# 01. Please be aware that there are no a set of universally appropriate settings,
 #     for all landslide inventories, or for all landslides in an inventory.
-#     Parameters should be selected according to every individual landslide cases.
+#     Settings should be defined according to every individual landslide cases.
+#
 # 02. According to personal experiences obtained from experiments on limited landslide inventories,
 #     the following recommendation is a good start.
+#
 # 03. Set MinGrpPntCnt and MinGrpAcrDst to be 3 and 0, respectively.
 #     That is to say, no constraints from group point count and group anchor distance.
-# 04. Select MinEndRtoInt and MinEndRtoDit to be 0 and 0, respectively.
-#     That is to say, no constraints from point count ratio of end groups.
-# 05. EndAgrCfgInt and EndAgrCfgDit, define algorithm for generating end anchors and strips, and can be 1 ~ 6.
-#     1: quad + quad for anchor and strip respectively, slow.
-#     2:  mbb + quad for anchor and strip respectively, slow.
-#     3: even + quad for anchor and strip respectively, slow.
-#     4: quad + mbb  for anchor and strip respectively, slow.
-#     5:  mbb + mbb  for anchor and strip respectively, 1st fast.
-#     6: even + mbb  for anchor and strip respectively, 2nd fast.
-#     "quad", "mbb", and "even" stand for quadrilateral, minimum bounding box, and evenly splitting, respectively.
-#     The recommendation for EndAgrCfg is 1.
-# 06. TIPS: if the profile (sub- grouping) of some landslides are not satisfied,
-#     try to re-process those landslides individually.
-#     First, by checking initial and distal end groups respectively, determine MinEndRtoInt and MinEndRtoDit,
-#     which will be a little bit larger than the ratio of the to-be-merged end sub- groups to all points.
-#     Then, determine EndAgrCfgInt and EndAgrCfgDit respectively by optimizing end anchors and strips.
-#     Try 1, 2, and 3 to see which algorithm (quad, mbb, or even) is the best for generating end anchors.
-#     If end strips are not satisfied, try correspondingly 4, 5, and 6 to see if mmb is better for generating end strips.
-#     That is to say, if quad yields the best end anchor, try 4; if mbb, try 5; if even, try 6.
-#     EndAgrCfg having quad might be very time consuming.
-#     Therefore, if the direction of end strip is not the concern,
-#     the recommended order of EndAgrCfg is 5, 6, and then 4.
-# 07. For some landslide cases, adjusting MinEndRtoInt, MinEndRtoDit, EndAgrCfgInt and EndAgrCfgDit is not adequate.
-#     Try to adjust the MinGrpAcrDst (minimum group anchor distance).
-#     Use MinGrpAcrDst as a last resort. Whenever possible, don't use MinGrpAcrDst.
-#     The use of MinGrpAcrDst will reduce the resolution of profile (count of anchors).
-# 08. The spatial resolution of the used DEM is a reasonable value for MinStpHrzLen.
-#     MinStpHrzLen controls number of strips, and will not influence the generation of profile.
+#
+# 04. The spatial resolution of the used DEM is a reasonable value for MinStpHrzLen.
+#     MinStpHrzLen controls number of strips, and will not influence the generation of path
 #     Smaller MSHL values will in general produce a larger number of strips.
 #     Be aware that the smallest count of strip is 2, no matter how large MinStpHrzLen is.
-# 09. The input DEM is expected to represent the sliding surface.
+#
+# 05. Set MinEndRtoInt and MinEndRtoDit to be 0 and 0, respectively.
+#     That is to say, no constraints from point count ratio of end groups.
+#
+# 06. Define a parameters file, using the above suggested parameters, 
+#     and, using the names of landslides as FilePrefix.
+#
+# 07. Define EndAnchors and EndStrips configurations shapefiles, 
+#     according to your experts' knowledge.
+#
+# 08. TIPS: if the path (sub- grouping) of some landslides are not satisfying,
+#     try to re-process those landslides using respective appropriate settings.
+#     Usually, the adjustment in this step is for MinEndRto parameters.
+#     By checking end groups, adjust MinEndRtoInt and MinEndRtoDit,
+#     which will be a little bit larger than, 
+#     the ratio of the points in the to-be-merged end sub- groups to all points.
+#
+# 09. It is not recommended to use predefined algorithms to obtain end anchors and strips.
+#     If predefined algorithms ("mmb", "quad", "even", and "prll") are used, 
+#     users can try different combinations of predefined algorithms to get satisfying results,
+#     but, the results will be less controllable.
+#
+# 10. Normally, we do not need to use MinGrpAcrDst, and it is a last resort.
+#     Do not use MinGrpAcrDst (minimum group anchor distance), Whenever possible.
+#     The use of MinGrpAcrDst will reduce the resolution of profile (count of anchors).
+#     
+# 11. The input DEM is expected to represent the sliding surface.
 #     If the input DEM represents the post-sliding or pre-sliding surface,
 #     which will be most likely in applications, a profile will be still generated;
 #     but, be aware that, elevation of profile will not represent elevation of sliding surface.
-# 10. Some problems of running ALPA might be owing to the environment of user computer.
+#
+# 12. Some problems of running ALPA might be owing to the environment of user computer.
 #     Try to firstly solve them by searching solutions regarding R and RStudio.
 #
 #
@@ -229,6 +342,10 @@ ALPA("dem.tif", "lsd.shp", 3, 0, 0.00, 0.00, 1, 1, 30, "case_c003_d000_ri0.00_rd
 # Version 3.1 (July 20th, 2023)
 # 1. Update the algorithm for minimizing point count ratio of end groups.
 # 2. Fix a bug in handling the end group with the quad algorithm.
+#
+# Version 4.0 (November 4th, 2023)
+# 1. Update the algorithm for obtaining end anchors and end strips.
+# 2. Fix a bug in splitting end groups with small point counts.
 #
 #
 #
