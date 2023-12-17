@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.0                                #
+#                             Version 4.1                                #
 #                                                                        #
-#                          November 4th, 2023                            #
+#                          December 17th, 2023                           #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -442,7 +442,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
       # check
       if (is.null(list_pnts_path)) {
         #
-        # message, if when reading pnts
+        # message
         message("Error: f_pnts_path return NULL.")
         #
         # return
@@ -554,9 +554,6 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
             # update list_pnts
             list_pnts[[i-idx_EndMerged+1]] <- pnts_i
           }
-          #
-          # list2pnts
-          pnts_split <- f_list2pnts(list_pnts)
         }
       }
       #
@@ -631,9 +628,6 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           #
           # update list_pnts
           list_pnts[[idx_EndMerged]] <- pnts_distal
-          #
-          # list2pnts
-          pnts_split <- f_list2pnts(list_pnts)
         }
       }
       #
@@ -647,92 +641,31 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
       while (idx_hierarchical >= 1) {
         #
         # get list_pnts
-        list_pnts <- list_list_pnts[[idx_hierarchical]]
+        list_pnts_Hierarchical <- list_list_pnts[[idx_hierarchical]]
         #
-        # when quadrilateral algorithm is used for end groups,
-        # this will be the most time consuming step?
-        # #
-        # # show step
-        # time_step_start <- f_show_step(paste("f_pnts_path start.", "\n", sep = ""))
-        #
-        # get path (centers and bnd sides)
-        list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, T)
+        # get package
+        strips_package <- f_strips_package(list_pnts_Hierarchical, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
         #
         # check
-        if (is.null(list_pnts_path)) {
+        if (is.null(strips_package)) {
           #
-          # message, if when reading pnts
+          # message
           message("Error: f_pnts_path return NULL.")
           #
           # return
           return(NULL)
         }
-        # #
-        # # show step time
-        # f_show_time(paste("f_pnts_path done.", "\n", sep = ""), time_step_start)
-        #
-        # get centers
-        pnts_split_anchors <- list_pnts_path[[1]]
-        #
-        # get length
-        length_prfl <- sum(f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy")]))
-        #
-        # initial
-        count_strip <- 0
-        #
-        # get count
-        while (T) {
-          #
-          # update
-          if (length_prfl/(count_strip+1) >= MinStpHrzLen) { count_strip <- count_strip+1 }
-          else { break }
-        }
-        #
-        # check, at least two strip, do not allow no station
-        count_strip <- max(count_strip, 2)
-        #
-        # get strips, strip might be merged
-        list_strips <- f_strips(pPolygons, list_pnts_path, count_strip)
         #
         # check
-        if (is.null(list_strips)) {
-          #
-          list_areas <- NULL
-        }
-        else {
-          #
-          # get
-          list_strip_sp <- list_strips[[1]]
-          strip_nodes_for_sp <- list_strips[[2]]
-          #
-          # get areas
-          list_areas <- f_strips_areas(pRasterDEM, list_strip_sp, strip_nodes_for_sp)
-          #
-          # get 
-          strip_sp <- list_strip_sp
-          # get 
-          strip_df <- list_areas[[1]]
-          # get 
-          strip_nodes <- list_areas[[2]]
-          # get 
-          strip_triangle_sp <- list_areas[[3]]
-          strip_triangle_df <- list_areas[[4]]
-          #
-          # get paras
-          paras_strip <- c(sum(strip_df[, "Lhrz"]), sum(strip_df[, "Ahrz"]), sum(strip_df[, "Lall"]), sum(strip_df[, "Aall"]))
-        }
-        #
-        # check
-        # if (~(is.null(list_areas))) {
-        if (length(list_areas) != 0) {
-          #
-          # break
-          break
-        }
-        else {
+        if (length(strips_package) == 0) {
           #
           # next
           idx_hierarchical <- idx_hierarchical - 1
+        }
+        else {
+          #
+          # break
+          break
         }
       }
       #
@@ -767,25 +700,252 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
       # check, if have valid
       else {
         #
-        # list2pnts
-        pnts_split <- f_list2pnts(list_pnts)
-        #
         # if valid in last hierarchical
         if (idx_hierarchical == length(list_list_pnts)) {
+          #
+          # list2pnts
+          pnts_split <- f_list2pnts(list_pnts)
           # 
           # set SMS, to be "SMG", stop because all subgroup stop split
           pnts_split[, "SMS"] <- "SMG"
         }
         # if valid in previous hierarchical
         else {
-          # 
-          # set SMS, to be "SMV" (have valid), 
-          # stop at valid sub- grouping for anchors or their collecting line inside landslide polygon
-          pnts_split[, "SMS"] <- "SMV"
           #
-          # message
-          message("Warning: SMS is SMV.")
+          # save original
+          list_pnts0 <- list_pnts
+          #
+          # get 
+          GrpCnt <- length(list_pnts0)
+          #
+          # get
+          EndCnt_Initial <- 0
+          EndCnt_Initial_Target <- nrow(list_pnts_Hierarchical[[1]])
+          #
+          # initial
+          idx_replace_Intial <- 1
+          #
+          # replace idx, initial
+          for (i in 1:GrpCnt) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # get ratio for end group
+            EndCnt_Initial <- EndCnt_Initial + nrow(pnts_i)
+            #
+            # check
+            if (EndCnt_Initial == EndCnt_Initial_Target)
+            { idx_replace_Intial <- i }
+          }
+          #
+          # get
+          EndCnt_Distal <- 0
+          EndCnt_Distal_Target <- nrow(list_pnts_Hierarchical[[length(list_pnts_Hierarchical)]])
+          #
+          # initial
+          idx_replace_Distal <- 1
+          #
+          # replace idx, distal
+          for (i in GrpCnt:(-1):1) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # get ratio for end group
+            EndCnt_Distal <- EndCnt_Distal + nrow(pnts_i)
+            #
+            # check
+            if (EndCnt_Distal == EndCnt_Distal_Target)
+            { idx_replace_Distal <- i }
+          }
+          #
+          # replace, initial
+          list_pnts_EndReplaceInitial <- list()
+          #
+          # replace, initial
+          pnts_initial <- list_pnts_Hierarchical[[1]]
+          #
+          # set pnts
+          pnts_initial[, "SMG"] <- "SGS"
+          pnts_initial[, "grp"] <- 1
+          #
+          # replace
+          list_pnts_EndReplaceInitial[[1]] <- pnts_initial
+          #
+          # update list_pnts
+          for (i in (idx_replace_Intial+1):GrpCnt) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # set pnts
+            pnts_i[, "grp"] <- i-idx_replace_Intial+1
+            #
+            # update list_pnts
+            list_pnts_EndReplaceInitial[[i-idx_replace_Intial+1]] <- pnts_i
+          }
+          # check list_pnts
+          pnts_split_EndReplaceInitial <- f_list2pnts(list_pnts_EndReplaceInitial)
+          # check list_pnts
+          if (nrow(pnts_split_EndReplaceInitial) != nrow(pnts)) {
+            #
+            # debugging
+            message("Error: count of pnts inconsistent.")
+            #
+            # set
+            list_pnts_EndReplaceInitial <- NULL
+          }
+          #
+          # replace, distal
+          list_pnts_EndReplaceDistal <- list()
+          #
+          # replace, distal
+          pnts_distal <- list_pnts_Hierarchical[[length(list_pnts_Hierarchical)]]
+          #
+          # set pnts
+          pnts_distal[, "SMG"] <- "SGS"
+          pnts_distal[, "grp"] <- idx_replace_Distal
+          #
+          # replace
+          list_pnts_EndReplaceDistal[[idx_replace_Distal]] <- pnts_distal
+          #
+          # update list_pnts
+          for (i in 1:(idx_replace_Distal-1)) {
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # set pnts
+            pnts_i[, "grp"] <- i
+            #
+            # update list_pnts
+            list_pnts_EndReplaceDistal[[i]] <- pnts_i
+          }
+          # check list_pnts
+          pnts_split_EndReplaceDistal <- f_list2pnts(list_pnts_EndReplaceDistal)
+          # check list_pnts
+          if (nrow(pnts_split_EndReplaceDistal) != nrow(pnts)) {
+            #
+            # debugging
+            message("Error: count of pnts inconsistent.")
+            #
+            # set
+            list_pnts_EndReplaceDistal <- NULL
+          }
+          #
+          # replace, both
+          list_pnts_EndReplaceBoth <- list()
+          #
+          # set pnts
+          pnts_distal[, "grp"] <- idx_replace_Distal - idx_replace_Intial + 1
+          #
+          # replace
+          list_pnts_EndReplaceBoth[[1]] <- pnts_initial
+          # replace
+          list_pnts_EndReplaceBoth[[idx_replace_Distal - idx_replace_Intial + 1]] <- pnts_distal
+          #
+          # update list_pnts
+          for (i in (idx_replace_Intial+1):(idx_replace_Distal-1)) {
+            #
+            # check
+            if (idx_replace_Intial+1 > idx_replace_Distal-1)
+            { break }
+            #
+            # get pnts
+            pnts_i <- list_pnts0[[i]]
+            #
+            # set pnts
+            pnts_i[, "grp"] <- i-idx_replace_Intial+1
+            #
+            # update list_pnts
+            list_pnts_EndReplaceBoth[[i-idx_replace_Intial+1]] <- pnts_i
+          }
+          # check list_pnts
+          pnts_split_EndReplaceBoth <- f_list2pnts(list_pnts_EndReplaceBoth)
+          # check list_pnts
+          if (nrow(pnts_split_EndReplaceBoth) != nrow(pnts)) {
+            #
+            # debugging
+            message("Error: count of pnts inconsistent.")
+            #
+            # set
+            list_pnts_EndReplaceBoth <- NULL
+          }
+          #
+          # get package
+          strips_package_EndReplaceInitial <- f_strips_package(list_pnts_EndReplaceInitial, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+          strips_package_EndReplaceDistal <- f_strips_package(list_pnts_EndReplaceDistal, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+          strips_package_EndReplaceBoth <- f_strips_package(list_pnts_EndReplaceBoth, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+          #
+          # check
+          if (is.null(strips_package_EndReplaceInitial) || 
+              is.null(strips_package_EndReplaceDistal) ||
+              is.null(strips_package_EndReplaceBoth)) {
+            #
+            # message
+            message("Error: f_pnts_path return NULL.")
+            #
+            # return
+            return(NULL)
+          }
+          #
+          # check
+          if (length(strips_package_EndReplaceInitial) != 0 ||
+              length(strips_package_EndReplaceDistal) != 0 ||
+              length(strips_package_EndReplaceBoth) != 0) {
+            #
+            # get
+            if (length(strips_package_EndReplaceInitial) != 0) 
+            { list_pnts <- list_pnts_EndReplaceInitial }
+            #
+            else if (length(strips_package_EndReplaceDistal) != 0)
+            { list_pnts <- list_pnts_EndReplaceDistal }
+            #
+            else if (length(strips_package_EndReplaceBoth) != 0)
+            { list_pnts <- list_pnts_EndReplaceBoth }
+            #
+            # list2pnts
+            pnts_split <- f_list2pnts(list_pnts)
+            # 
+            # set SMS, to be "SMG", stop because all subgroup stop split
+            pnts_split[, "SMS"] <- "SMG"
+          }
+          else {
+            #
+            # get
+            list_pnts <- list_pnts_Hierarchical
+            #
+            # list2pnts
+            pnts_split <- f_list2pnts(list_pnts)
+            # 
+            # set SMS, to be "SMV" (have valid), 
+            # stop at valid sub- grouping for anchors or their collecting line inside landslide polygon
+            pnts_split[, "SMS"] <- "SMV"
+            #
+            # message
+            message("Warning: SMS is SMV.")
+          }
         }
+        #
+        # get package
+        strips_package <- f_strips_package(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+        #
+        # get centers
+        pnts_split_anchors <- strips_package[[1]]
+        #
+        # get 
+        strip_sp <- strips_package[[2]]
+        # get 
+        strip_df <- strips_package[[3]]
+        # get 
+        strip_nodes <- strips_package[[4]]
+        # get 
+        strip_triangle_sp <- strips_package[[5]]
+        strip_triangle_df <- strips_package[[6]]
+        #
+        # get paras
+        paras_strip <- strips_package[[7]]
         #
         # save pnts
         file_out <- paste(FilePrefix, "_pnts_grps.xlsx", sep = "", collapse = NULL)
@@ -1490,7 +1650,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
             grpm <- 1
             #
             # set pnts_i
-            pnts_i[, "SMG"] <- "SGS"
+            pnts_i[, "SMG"] <- "SGD"
             pnts_i[, "grp"] <- grpu
             #
             # update list
@@ -6710,6 +6870,111 @@ f_strips_areas <- function(pRasterDEM, list_strip_sp, strip_nodes) {
   #
   # return
   return(list(strip_df, strip_nodes2, list_triangle_sp, triangle_df))
+}
+#
+#
+#
+f_strips_package <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM) {
+  #
+  # when quadrilateral algorithm is used for end groups,
+  # this will be the most time consuming step?
+  # #
+  # # show step
+  # time_step_start <- f_show_step(paste("f_pnts_path start.", "\n", sep = ""))
+  #
+  # get path (centers and bnd sides)
+  list_pnts_path <- f_pnts_path(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, T)
+  #
+  # check
+  if (is.null(list_pnts_path)) {
+    #
+    # message
+    message("Error: f_pnts_path return NULL.")
+    #
+    # return
+    return(NULL)
+  }
+  # #
+  # # show step time
+  # f_show_time(paste("f_pnts_path done.", "\n", sep = ""), time_step_start)
+  #
+  # get centers
+  pnts_split_anchors <- list_pnts_path[[1]]
+  #
+  # get length
+  length_prfl <- sum(f_pnts_distances(pnts_split_anchors[, c("Cx", "Cy")]))
+  #
+  # initial
+  count_strip <- 0
+  #
+  # get count
+  while (T) {
+    #
+    # update
+    if (length_prfl/(count_strip+1) >= MinStpHrzLen) { count_strip <- count_strip+1 }
+    else { break }
+  }
+  #
+  # check, at least two strip, do not allow no station
+  count_strip <- max(count_strip, 2)
+  #
+  # get strips, strip might be merged
+  list_strips <- f_strips(pPolygons, list_pnts_path, count_strip)
+  #
+  # check
+  if (is.null(list_strips)) {
+    #
+    list_areas <- NULL
+  }
+  else {
+    #
+    # get
+    list_strip_sp <- list_strips[[1]]
+    strip_nodes_for_sp <- list_strips[[2]]
+    #
+    # get areas
+    list_areas <- f_strips_areas(pRasterDEM, list_strip_sp, strip_nodes_for_sp)
+    #
+    # get 
+    strip_sp <- list_strip_sp
+    # get 
+    strip_df <- list_areas[[1]]
+    # get 
+    strip_nodes <- list_areas[[2]]
+    # get 
+    strip_triangle_sp <- list_areas[[3]]
+    strip_triangle_df <- list_areas[[4]]
+    #
+    # get paras
+    paras_strip <- c(sum(strip_df[, "Lhrz"]), sum(strip_df[, "Ahrz"]), sum(strip_df[, "Lall"]), sum(strip_df[, "Aall"]))
+  }
+  #
+  # initial
+  strips_package <- list()
+  #
+  # check
+  # if (~(is.null(list_areas))) {
+  if (length(list_areas) != 0) {
+    #
+    # get centers
+    strips_package[[1]] <- pnts_split_anchors
+    #
+    # get 
+    strips_package[[2]] <- strip_sp
+    # get 
+    strips_package[[3]] <- strip_df
+    # get 
+    strips_package[[4]] <- strip_nodes
+    # get 
+    strips_package[[5]] <- strip_triangle_sp
+    strips_package[[6]] <- strip_triangle_df
+    #
+    # get paras
+    strips_package[[7]] <- paras_strip
+  }
+  #
+  # return
+  return(strips_package)
 }
 #
 #

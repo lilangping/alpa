@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.0                                #
+#                             Version 4.1                                #
 #                                                                        #
-#                          November 4th, 2023                            #
+#                          December 17th, 2023                           #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -346,6 +346,9 @@ ALPA("In_DEM.tif", "In02_Landslides.shp", "In02_Parameters.xlsx", "In02_EndAncho
 # Version 4.0 (November 4th, 2023)
 # 1. Update the algorithm for obtaining end anchors and end strips.
 # 2. Fix a bug in splitting end groups with small point counts.
+#
+# Version 4.1 (December 17th, 2023)
+# 1. Fix a bug in handling manually-defined end anchors out end groups.
 #
 #
 #
