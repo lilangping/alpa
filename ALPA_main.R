@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.1                                #
+#                             Version 4.2                                #
 #                                                                        #
-#                          December 18th, 2023                           #
+#                          January 15th, 2024                            #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -776,6 +776,10 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           # update list_pnts
           for (i in (idx_replace_Intial+1):GrpCnt) {
             #
+            # check
+            if (idx_replace_Intial+1 > GrpCnt || i < 1 || i > length(list_pnts0))
+            { break }
+            #
             # get pnts
             pnts_i <- list_pnts0[[i]]
             #
@@ -813,6 +817,10 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           # update list_pnts
           for (i in 1:(idx_replace_Distal-1)) {
             #
+            # check
+            if (1 > idx_replace_Distal-1 || i < 1 || i > length(list_pnts0))
+            { break }
+            #
             # get pnts
             pnts_i <- list_pnts0[[i]]
             #
@@ -843,13 +851,14 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           # replace
           list_pnts_EndReplaceBoth[[1]] <- pnts_initial
           # replace
-          list_pnts_EndReplaceBoth[[idx_replace_Distal - idx_replace_Intial + 1]] <- pnts_distal
+          if (idx_replace_Distal - idx_replace_Intial + 1 >= 2)
+            list_pnts_EndReplaceBoth[[idx_replace_Distal - idx_replace_Intial + 1]] <- pnts_distal
           #
           # update list_pnts
           for (i in (idx_replace_Intial+1):(idx_replace_Distal-1)) {
             #
             # check
-            if (idx_replace_Intial+1 > idx_replace_Distal-1)
+            if (idx_replace_Intial+1 > idx_replace_Distal-1 || i < 1 || i > length(list_pnts0))
             { break }
             #
             # get pnts
@@ -3721,58 +3730,15 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     # get pnts
     pnts <- list_pnts[[1]]
     #
-    # get pnts_bnd
-    pnts_bnd <- pnts[which(pnts[, "IDB"] != 0), ]
-    #
-    # get launch anchor
-    LaunchAnchor <- pnts_bnd[which.max(pnts_bnd[, "Cz"]), ]
-    # get launch anchor, ID
-    ID_LAcr <- LaunchAnchor[, "ID"]
-    # get launch anchor, IDB
-    IDB_LAcr <- LaunchAnchor[, "IDB"]
-    # get launch anchor, IDB
-    IDB_LAcr1m <- IDB_LAcr - 1
-    if (IDB_LAcr1m < 1) { IDB_LAcr1m <- IDB_max }
-    # get launch anchor, IDB
-    IDB_LAcr1p <- IDB_LAcr + 1
-    if (IDB_LAcr1p > IDB_max) { IDB_LAcr1p <- 1 }
-    # get launch anchor, ID
-    ID_LAcr1m <- which(pnts_bnd[, "IDB"] == IDB_LAcr1m)
-    ID_LAcr1p <- which(pnts_bnd[, "IDB"] == IDB_LAcr1p)
-    #
-    # remove launch anchor
-    pnts_bnd_rm_LAcr <- pnts_bnd[-which(pnts_bnd[, "ID"] == ID_LAcr), ]
-    #
-    # get, for end group
-    list_end <- f_pnts_bnd_end_mbb(pnts_bnd_rm_LAcr, pnts_bnd[c(ID_LAcr1m, ID_LAcr1p), c("Cx", "Cy")])
-    # get, for end group
-    bnd_sides_right <- list_end[[1]]
-    bnd_sides_left <- list_end[[2]]
-    # get, for end group
-    GrpBndAgl_initial <- list_end[[3]]
-    GrpBndAgl_distal <- list_end[[3]]
-    #
-    # get bnd sides
-    list_bnd_sides <- list(bnd_sides_right, bnd_sides_left)
-    # #
-    # # switch, do not need here?
-    # list_bnd_sides <- f_pnts_bnd_sides_switch2(list_bnd_sides, LaunchAnchor, IDB_max)
-    #
-    # get bnd sides
-    bnd_sides_right <- list_bnd_sides[[1]]
-    bnd_sides_left <- list_bnd_sides[[2]]
-    #
-    # get centerLs
-    centerLs <- f_pnts_bnd_sides_centerLs(list_bnd_sides)
-    #
     # get anchor initial
-    anchor_initial <- c(centerLs[1, ], f_pnts_zip(pnts, centerLs[1, 1], centerLs[1, 2]))
-    #
+    anchor_initial <- c(EndAnchorsInt, f_pnts_zip(pnts, EndAnchorsInt[1], EndAnchorsInt[2]))
     # get anchor distal
-    anchor_distal <- c(centerLs[2, ], f_pnts_zip(pnts, centerLs[2, 1], centerLs[2, 2]))
-    #
+    anchor_distal <- c(EndAnchorsDit, f_pnts_zip(pnts, EndAnchorsDit[1], EndAnchorsDit[2]))
+    # get anchor mid xy
+    anchor_mid_x <- (EndAnchorsInt[1] + EndAnchorsDit[1]) / 2
+    anchor_mid_y <- (EndAnchorsInt[2] + EndAnchorsDit[2]) / 2
     # get anchor mid
-    anchor_mid <- c(centerLs[3, ], f_pnts_zip(pnts, centerLs[3, 1], centerLs[3, 2]))
+    anchor_mid <- c(anchor_mid_x, anchor_mid_y, f_pnts_zip(pnts, anchor_mid_x, anchor_mid_y))
     #
     # get type
     column_type <- data.frame("Anchor: Initial group anchor", "Anchor: Group center", "Anchor: Distal group anchor")
@@ -3793,41 +3759,188 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     # colnames
     colnames(column_anchors) <- c("Cx", "Cy", "Cz", "type", "grp")
     #
-    # update initial and distal anchors
-    # let them connect to polygon boundary
+    # get pnts_bnd
+    pnts_bnd <- pnts[which(pnts[, "IDB"] != 0), ]
     #
-    # set a switch
-    if (T) {
+    # get sorted
+    pnts_bnd_ascending <- f_pnts_bnd_ascending(pnts_bnd)
+    #
+    # initial
+    column_dist_Int <- c()
+    column_dist_Dit <- c()
+    #
+    for (i in 1:length(pnts_bnd_ascending)) {
       #
-      # check
-      if (nrow(pnts_bnd) > 3) {
+      x <- pnts_bnd_ascending[i, "Cx"]
+      y <- pnts_bnd_ascending[i, "Cy"]
+      #
+      dist <- sqrt((x - EndAnchorsInt[1])^2 + (y - EndAnchorsInt[2])^2)
+      column_dist_Int <- rbind(column_dist_Int, dist)
+      #
+      dist <- sqrt((x - EndAnchorsDit[1])^2 + (y - EndAnchorsDit[2])^2)
+      column_dist_Dit <- rbind(column_dist_Dit, dist)
+    }
+    #
+    # initial
+    bnd_sides_right_idx_initial <- 0
+    bnd_sides_right_idx_distal <- 0
+    # initial
+    bnd_sides_left_idx_initial <- 0
+    bnd_sides_left_idx_distal <- 0
+    #
+    # get sorted
+    column_dist_Int_SortIndex <- sort(column_dist_Int, index.return=TRUE)$ix
+    #
+    # get profile line
+    lx_prfl <- EndAnchorsDit[1] - EndAnchorsInt[1]
+    ly_prfl <- EndAnchorsDit[2] - EndAnchorsInt[2]
+    lz_prfl <- 0
+    #
+    # check
+    for (i in 1:length(pnts_bnd_ascending)) {
+      #
+      # get index
+      idx1 <- column_dist_Int_SortIndex[i]
+      idx2 <- idx1 + 1
+      if (idx2 > length(pnts_bnd_ascending)) { idx2 <- 1 }
+      #
+      lx1 <- pnts_bnd_ascending[idx1, "Cx"] - EndAnchorsInt[1]
+      ly1 <- pnts_bnd_ascending[idx1, "Cy"] - EndAnchorsInt[2]
+      lz1 <- 0
+      #
+      lx2 <- pnts_bnd_ascending[idx2, "Cx"] - EndAnchorsInt[1]
+      ly2 <- pnts_bnd_ascending[idx2, "Cy"] - EndAnchorsInt[2]
+      lz2 <- 0
+      #
+      cp1 <- cross(c(lx_prfl, ly_prfl, lz_prfl), c(lx1, ly1, lz1))
+      cp2 <- cross(c(lx_prfl, ly_prfl, lz_prfl), c(lx2, ly2, lz2))
+      #
+      if (cp1[3] > 0 && cp2[3] < 0) {
         #
-        # update
-        anchor_xy_initial <- f_pnts_path_extending(column_anchors[c(2, 1), c("Cx", "Cy")], pPolygons)
-        column_anchors[1, c("Cx", "Cy", "Cz")] <- c(anchor_xy_initial, f_pnts_zip(pnts, anchor_xy_initial[1], anchor_xy_initial[2]))
+        bnd_sides_left_idx_distal <- idx1
+        bnd_sides_right_idx_initial <- idx2
         #
-        # update
-        anchor_xy_distal <- f_pnts_path_extending(column_anchors[c(2, 3), c("Cx", "Cy")], pPolygons)
-        column_anchors[3, c("Cx", "Cy", "Cz")] <- c(anchor_xy_distal, f_pnts_zip(pnts, anchor_xy_distal[1], anchor_xy_distal[2]))
-      }
-      else {
-        #
-        # update
-        anchor_xy_initial <- f_pnts_path_extending(rbind(column_anchors[2, c("Cx", "Cy")], LaunchAnchor[1, c("Cx", "Cy")]), pPolygons)
-        column_anchors[1, c("Cx", "Cy", "Cz")] <- c(anchor_xy_initial, f_pnts_zip(pnts, anchor_xy_initial[1], anchor_xy_initial[2]))
-        #
-        # update
-        anchor_xy_distal <- f_pnts_path_extending(rbind(LaunchAnchor[1, c("Cx", "Cy")], column_anchors[2, c("Cx", "Cy")]), pPolygons)
-        column_anchors[3, c("Cx", "Cy", "Cz")] <- c(anchor_xy_distal, f_pnts_zip(pnts, anchor_xy_distal[1], anchor_xy_distal[2]))
-        #
-        # update
-        anchor_xy_mid <- c((anchor_xy_initial[1]+anchor_xy_distal[1])/2, (anchor_xy_initial[2]+anchor_xy_distal[2])/2)
-        column_anchors[2, c("Cx", "Cy", "Cz")] <- c(anchor_xy_mid, f_pnts_zip(pnts, anchor_xy_mid[1], anchor_xy_mid[2]))
-        #
-        # update
-        # do not update bnd_sides_right and bnd_sides_left?
+        break
       }
     }
+    #
+    # get sorted
+    column_dist_Dit_SortIndex <- sort(column_dist_Dit, index.return=TRUE)$ix
+    #
+    # get profile line
+    lx_prfl <- EndAnchorsInt[1] - EndAnchorsDit[1]
+    ly_prfl <- EndAnchorsInt[2] - EndAnchorsDit[2]
+    lz_prfl <- 0
+    #
+    # check
+    for (i in 1:length(pnts_bnd_ascending)) {
+      #
+      # get index
+      idx1 <- column_dist_Dit_SortIndex[i]
+      idx2 <- idx1 + 1
+      if (idx2 > length(pnts_bnd_ascending)) { idx2 <- 1 }
+      #
+      lx1 <- pnts_bnd_ascending[idx1, "Cx"] - EndAnchorsDit[1]
+      ly1 <- pnts_bnd_ascending[idx1, "Cy"] - EndAnchorsDit[2]
+      lz1 <- 0
+      #
+      lx2 <- pnts_bnd_ascending[idx2, "Cx"] - EndAnchorsDit[1]
+      ly2 <- pnts_bnd_ascending[idx2, "Cy"] - EndAnchorsDit[2]
+      lz2 <- 0
+      #
+      cp1 <- cross(c(lx_prfl, ly_prfl, lz_prfl), c(lx1, ly1, lz1))
+      cp2 <- cross(c(lx_prfl, ly_prfl, lz_prfl), c(lx2, ly2, lz2))
+      #
+      if (cp1[3] > 0 && cp2[3] < 0) {
+        #
+        bnd_sides_right_idx_distal <- idx1
+        bnd_sides_left_idx_initial <- idx2
+        #
+        break
+      }
+    }
+    #
+    # get
+    if (bnd_sides_right_idx_initial < bnd_sides_right_idx_distal) {
+      #
+      bnd_sides_right <- pnts_bnd_ascending[bnd_sides_right_idx_initial:bnd_sides_right_idx_distal, ]
+    }
+    else {
+      #
+      bnd_sides_right <- pnts_bnd_ascending[bnd_sides_right_idx_initial:length(pnts_bnd_ascending), ]
+      bnd_sides_right <- rbind(bnd_sides_right, pnts_bnd_ascending[1:bnd_sides_right_idx_distal, ])
+    }
+    #
+    # get
+    if (bnd_sides_left_idx_initial < bnd_sides_left_idx_distal) {
+      #
+      bnd_sides_left <- pnts_bnd_ascending[bnd_sides_left_idx_initial:bnd_sides_left_idx_distal, ]
+    }
+    else {
+      #
+      bnd_sides_left <- pnts_bnd_ascending[bnd_sides_left_idx_initial:length(pnts_bnd_ascending), ]
+      bnd_sides_left <- rbind(bnd_sides_left, pnts_bnd_ascending[1:bnd_sides_left_idx_distal, ])
+    }
+    #
+    # for end group, initial
+    pnts0 = pnts_bnd_ascending[c(bnd_sides_left_idx_distal, bnd_sides_right_idx_initial), ]
+    #
+    # initial
+    agl <- EndStripsInt
+    #
+    # check
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get Agl0
+    Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # get angle, included
+    agl_icld <- f_angle_included(Agl0, agl)
+    #
+    # check
+    if (agl_icld > pi/2) { 
+      #
+      # reverse
+      agl <- agl - pi
+    }
+    #
+    # check
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get, for end group
+    GrpBndAgl_initial <- agl
+    #
+    # for end group, distal
+    pnts0 = pnts_bnd_ascending[c(bnd_sides_left_idx_initial, bnd_sides_right_idx_distal), ]
+    #
+    # distal
+    agl <- EndStripsDit
+    #
+    # check
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get Agl0
+    Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # get angle, included
+    agl_icld <- f_angle_included(Agl0, agl)
+    #
+    # check
+    if (agl_icld > pi/2) { 
+      #
+      # reverse
+      agl <- agl - pi
+    }
+    #
+    # check
+    if (agl > pi) { agl <- agl - pi*2 }
+    if (agl < -pi) { agl <- agl + pi*2 }
+    #
+    # get, for end group
+    GrpBndAgl_distal <- agl
     #
     # return
     return(list(column_anchors, list(bnd_sides_right), list(bnd_sides_left), c(GrpBndAgl_initial, GrpBndAgl_distal)))
