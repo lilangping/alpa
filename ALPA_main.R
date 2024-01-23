@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.2                                #
+#                             Version 4.3                                #
 #                                                                        #
-#                          January 15th, 2024                            #
+#                          January 23th, 2024                            #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -3769,7 +3769,7 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     column_dist_Int <- c()
     column_dist_Dit <- c()
     #
-    for (i in 1:length(pnts_bnd_ascending)) {
+    for (i in 1:nrow(pnts_bnd_ascending)) {
       #
       x <- pnts_bnd_ascending[i, "Cx"]
       y <- pnts_bnd_ascending[i, "Cy"]
@@ -3797,12 +3797,12 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     lz_prfl <- 0
     #
     # check
-    for (i in 1:length(pnts_bnd_ascending)) {
+    for (i in 1:nrow(pnts_bnd_ascending)) {
       #
       # get index
       idx1 <- column_dist_Int_SortIndex[i]
       idx2 <- idx1 + 1
-      if (idx2 > length(pnts_bnd_ascending)) { idx2 <- 1 }
+      if (idx2 > nrow(pnts_bnd_ascending)) { idx2 <- 1 }
       #
       lx1 <- pnts_bnd_ascending[idx1, "Cx"] - EndAnchorsInt[1]
       ly1 <- pnts_bnd_ascending[idx1, "Cy"] - EndAnchorsInt[2]
@@ -3833,12 +3833,12 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     lz_prfl <- 0
     #
     # check
-    for (i in 1:length(pnts_bnd_ascending)) {
+    for (i in 1:nrow(pnts_bnd_ascending)) {
       #
       # get index
       idx1 <- column_dist_Dit_SortIndex[i]
       idx2 <- idx1 + 1
-      if (idx2 > length(pnts_bnd_ascending)) { idx2 <- 1 }
+      if (idx2 > nrow(pnts_bnd_ascending)) { idx2 <- 1 }
       #
       lx1 <- pnts_bnd_ascending[idx1, "Cx"] - EndAnchorsDit[1]
       ly1 <- pnts_bnd_ascending[idx1, "Cy"] - EndAnchorsDit[2]
@@ -3867,7 +3867,7 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     }
     else {
       #
-      bnd_sides_right <- pnts_bnd_ascending[bnd_sides_right_idx_initial:length(pnts_bnd_ascending), ]
+      bnd_sides_right <- pnts_bnd_ascending[bnd_sides_right_idx_initial:nrow(pnts_bnd_ascending), ]
       bnd_sides_right <- rbind(bnd_sides_right, pnts_bnd_ascending[1:bnd_sides_right_idx_distal, ])
     }
     #
@@ -3878,7 +3878,7 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     }
     else {
       #
-      bnd_sides_left <- pnts_bnd_ascending[bnd_sides_left_idx_initial:length(pnts_bnd_ascending), ]
+      bnd_sides_left <- pnts_bnd_ascending[bnd_sides_left_idx_initial:nrow(pnts_bnd_ascending), ]
       bnd_sides_left <- rbind(bnd_sides_left, pnts_bnd_ascending[1:bnd_sides_left_idx_distal, ])
     }
     #
@@ -3894,6 +3894,13 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     #
     # get Agl0
     Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # debugging
+    if (is.na(Agl0) || is.na(agl)) {
+      #
+      # message
+      message("Error: NA angles for f_angle_included.")
+    }
     #
     # get angle, included
     agl_icld <- f_angle_included(Agl0, agl)
@@ -3924,6 +3931,13 @@ f_pnts_path <- function(list_pnts, IDB_max, pPolygons, EndAnchorsInt, EndAnchors
     #
     # get Agl0
     Agl0 <- atan2(pnts0[2, "Cy"]-pnts0[1, "Cy"], pnts0[2, "Cx"]-pnts0[1, "Cx"])
+    #
+    # debugging
+    if (is.na(Agl0) || is.na(agl)) {
+      #
+      # message
+      message("Error: NA angles for f_angle_included.")
+    }
     #
     # get angle, included
     agl_icld <- f_angle_included(Agl0, agl)

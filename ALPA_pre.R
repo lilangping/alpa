@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.2                                #
+#                             Version 4.3                                #
 #                                                                        #
-#                          January 15th, 2024                            #
+#                          January 23th, 2024                            #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -351,10 +351,12 @@ ALPA("In_DEM.tif", "In02_Landslides.shp", "In02_Parameters.xlsx", "In02_EndAncho
 # 1. Fix a bug in handling manually-defined end anchors out end groups.
 # 2. Disable outputting console to file using sink() because it does not work appropriately.
 #
-#
 # Version 4.2 (January 15th, 2024)
 # 1. Fix a bug in the situation that no sub-grouping is valid.
 # 2. Update the path generation algorithm for the situation that no sub-grouping is valid.
+#
+# Version 4.3 (January 23th, 2024)
+# 1. Fix a bug in handling the entire landslide points (no sub-groups).
 #
 #
 #
