@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.3                                #
+#                             Version 4.4                                #
 #                                                                        #
-#                          January 23th, 2024                            #
+#                          February 24th, 2024                           #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -357,6 +357,9 @@ ALPA("In_DEM.tif", "In02_Landslides.shp", "In02_Parameters.xlsx", "In02_EndAncho
 #
 # Version 4.3 (January 23th, 2024)
 # 1. Fix a bug in handling the entire landslide points (no sub-groups).
+#
+# Version 4.4 (February 24th, 2024)
+# 1. Fix a bug in merging (replacing) initial and distal groups.
 #
 #
 #

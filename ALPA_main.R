@@ -6,9 +6,9 @@
 #                                                                        #
 #       An R-Script for for automatic analysis of landslide path         #
 #                                                                        #
-#                             Version 4.3                                #
+#                             Version 4.4                                #
 #                                                                        #
-#                          January 23th, 2024                            #
+#                          February 24th, 2024                           #
 #                                                                        #
 #                       Langping LI, Hengxing LAN                        #
 #                                                                        #
@@ -723,6 +723,7 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           EndCnt_Initial_Target <- nrow(list_pnts_Hierarchical[[1]])
           #
           # initial
+          bool_replace_Intial <- TRUE
           idx_replace_Intial <- 1
           #
           # replace idx, initial
@@ -734,6 +735,14 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
             # get ratio for end group
             EndCnt_Initial <- EndCnt_Initial + nrow(pnts_i)
             #
+            # it is POSSIBLE that the end-est group is larger than the target
+            # then, use the end-est group, do not need to replace
+            if (i == 1 && EndCnt_Initial > EndCnt_Initial_Target) { 
+              #
+              bool_replace_Intial <- FALSE
+              break 
+            }
+            #
             # check
             if (EndCnt_Initial == EndCnt_Initial_Target)
             { idx_replace_Intial <- i }
@@ -744,7 +753,8 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
           EndCnt_Distal_Target <- nrow(list_pnts_Hierarchical[[length(list_pnts_Hierarchical)]])
           #
           # initial
-          idx_replace_Distal <- 1
+          bool_replace_Distal <- TRUE
+          idx_replace_Distal <- GrpCnt
           #
           # replace idx, distal
           for (i in GrpCnt:(-1):1) {
@@ -754,6 +764,14 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
             #
             # get ratio for end group
             EndCnt_Distal <- EndCnt_Distal + nrow(pnts_i)
+            #
+            # it is POSSIBLE that the end-est group is larger than the target
+            # then, use the end-est group, do not need to replace
+            if (i == GrpCnt && EndCnt_Distal > EndCnt_Distal_Target) {
+              #
+              bool_replace_Distal <- FALSE
+              break 
+            }
             #
             # check
             if (EndCnt_Distal == EndCnt_Distal_Target)
@@ -882,36 +900,79 @@ f_lasld_split <- function(pRasterDEM, pPolygons, iName, FilePrefix, MinGrpPntCnt
             list_pnts_EndReplaceBoth <- NULL
           }
           #
-          # get package
-          strips_package_EndReplaceInitial <- f_strips_package(list_pnts_EndReplaceInitial, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
-          strips_package_EndReplaceDistal <- f_strips_package(list_pnts_EndReplaceDistal, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
-          strips_package_EndReplaceBoth <- f_strips_package(list_pnts_EndReplaceBoth, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+          # initial
+          strips_package_EndReplaceInitial <- NULL
           #
-          # check
-          if (is.null(strips_package_EndReplaceInitial) || 
-              is.null(strips_package_EndReplaceDistal) ||
-              is.null(strips_package_EndReplaceBoth)) {
+          # get package
+          if (bool_replace_Intial) {
             #
-            # message
-            message("Error: f_pnts_path return NULL.")
+            # get package
+            strips_package_EndReplaceInitial <- f_strips_package(list_pnts_EndReplaceInitial, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
             #
-            # return
-            return(NULL)
+            # check
+            if (is.null(strips_package_EndReplaceInitial)) {
+              #
+              # message
+              message("Error: f_pnts_path return NULL.")
+              #
+              # return
+              return(NULL)
+            }
+          }
+          #
+          # initial
+          strips_package_EndReplaceDistal <- NULL
+          #
+          # get package
+          if (bool_replace_Distal) {
+            #
+            # get package
+            strips_package_EndReplaceDistal <- f_strips_package(list_pnts_EndReplaceDistal, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+            #
+            # check
+            if (is.null(strips_package_EndReplaceDistal)) {
+              #
+              # message
+              message("Error: f_pnts_path return NULL.")
+              #
+              # return
+              return(NULL)
+            }
+          }
+          #
+          # initial
+          strips_package_EndReplaceBoth <- NULL
+          #
+          # get package
+          if (bool_replace_Intial && bool_replace_Distal) {
+            #
+            # get package
+            strips_package_EndReplaceBoth <- f_strips_package(list_pnts_EndReplaceBoth, IDB_max, pPolygons, EndAnchorsInt, EndAnchorsDit, EndStripsInt, EndStripsDit, MinStpHrzLen, pRasterDEM)
+            #
+            # check
+            if (is.null(strips_package_EndReplaceBoth)) {
+              #
+              # message
+              message("Error: f_pnts_path return NULL.")
+              #
+              # return
+              return(NULL)
+            }
           }
           #
           # check
-          if (length(strips_package_EndReplaceInitial) != 0 ||
-              length(strips_package_EndReplaceDistal) != 0 ||
-              length(strips_package_EndReplaceBoth) != 0) {
+          if ((!is.null(strips_package_EndReplaceInitial) && length(strips_package_EndReplaceInitial) != 0) ||
+              (!is.null(strips_package_EndReplaceDistal) && length(strips_package_EndReplaceDistal) != 0) ||
+              (!is.null(strips_package_EndReplaceBoth) && length(strips_package_EndReplaceBoth) != 0)) {
             #
             # get
-            if (length(strips_package_EndReplaceInitial) != 0) 
+            if ((!is.null(strips_package_EndReplaceInitial) && length(strips_package_EndReplaceInitial) != 0)) 
             { list_pnts <- list_pnts_EndReplaceInitial }
             #
-            else if (length(strips_package_EndReplaceDistal) != 0)
+            else if ((!is.null(strips_package_EndReplaceDistal) && length(strips_package_EndReplaceDistal) != 0))
             { list_pnts <- list_pnts_EndReplaceDistal }
             #
-            else if (length(strips_package_EndReplaceBoth) != 0)
+            else if ((!is.null(strips_package_EndReplaceBoth) && length(strips_package_EndReplaceBoth) != 0))
             { list_pnts <- list_pnts_EndReplaceBoth }
             #
             # list2pnts
