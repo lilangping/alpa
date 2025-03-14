@@ -148,7 +148,7 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 #       The recommendation is to use "mbb" (1) as a start, which is also the default choice.
 #
 # 5. Please make sure, in the input landslide, parameter, and configuration files, 
-#    the order (of landslides/features) in the xlsx and shapefile dbf tables are consistent.
+#    the orders (of landslides/features) in the xlsx and shapefile dbf tables are consistent.
 #
 # 6. Please make sure, all input GIS data (DEM file and shapefiles), 
 #    have the same coordinate system.
