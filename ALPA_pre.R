@@ -150,22 +150,25 @@ if (!require("sf"))   install.packages("sf", dependencies = TRUE)
 # 5. Please make sure, in the input landslide, parameter, and configuration files, 
 #    the orders (of landslides/features) in the xlsx and shapefile dbf tables are consistent.
 #
-# 6. Please make sure, all input GIS data (DEM file and shapefiles), 
+# 6. Please make sure, end anchors in the input configuration files,
+#    are located on the landslide polygon.
+#
+# 7. Please make sure, all input GIS data (DEM file and shapefiles), 
 #    have the same coordinate system.
 #
-# 7. Please make sure, the resolution of the input DEM, 
+# 8. Please make sure, the resolution of the input DEM, 
 #    is integer.
 #
-# 8. It is recommended not to output hierarchical results/files, 
+# 9. It is recommended not to output hierarchical results/files, 
 #    i.e. to set OutputHrcl as "F" (also the default choice),
 #    especially when processing an inventory consisting of many landslides.
 #    If OutputHrcl is "T", only hierarchical sub- groups and anchors will be output.
 #
-# 9. The output points and profiles are two dimensional (2D).
+# 10. The output points and profiles are two dimensional (2D).
 #    3D (z-aware) points and profiles can be produced based on the output excel files,
 #    using software like ArcGIS.
 #
-# 10. Before applying the main function,
+# 11. Before applying the main function,
 #    please execute the script below,
 #    to set working directory and source the main R script.
 # 
