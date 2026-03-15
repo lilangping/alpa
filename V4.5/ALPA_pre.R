@@ -302,6 +302,23 @@ ALPA("In_DEM.tif", "In02_Landslides.shp", "In02_Parameters.xlsx", "In02_CfgEndAn
 # 12. Some problems of running ALPA might be owing to the environment of user computer.
 #     Try to firstly solve them by searching solutions regarding R and RStudio.
 #
+# 13. For some landslides, processing can be done even the console display error or warning messages.
+#     This means that, usable results are output for these landslides.
+#     Checking why error or warning messages are displayed in the console is necessary,
+#     only when you are not satisfied the the output results.
+#
+# 14. If the processing cease at a landslide, it means this landslide is not processable.
+#     Then, you can delete this landslide from the landslide shapefile,
+#     and continue to process the remaining landslides by run a now command.
+#     Why this landslide is not processable, can be checked particularly later.
+#
+# 15. Common reasons for the unprocessability of landslides include:
+#     1) the landslide is too small relative to the resolution of DEM,
+#     i.e., no enough elevation points are distributed in within the landslide.
+#     2) the landslide is too geometrically complex to be processed,
+#     e.g., the landslide is characterized by complex behaviors such as
+#     splitting, braiding, coalescence, and connection.
+#
 #
 #
 # === (major) UPDATES ===
