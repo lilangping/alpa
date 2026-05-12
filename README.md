@@ -28,5 +28,6 @@ References:
 [4] 李郎平, 兰恒星, 2022. 滑坡运动路径复杂度研究：综述与展望. 地球科学, 47(12), 4663–4680.
 
 
+Please also notice the version adjusted by Dr. Ruichen CHEN from China University of Geosciences (Beijing), which includes a Python script.
 
 
